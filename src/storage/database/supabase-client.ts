@@ -48,4 +48,4 @@ function getSupabaseClient(token?: string): SupabaseClient {
   });
 }
 
-export { loadEnv, getSupabaseCredentials, getSupabaseClient };
+export { getSupabaseCredentials, getSupabaseClient };
