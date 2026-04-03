@@ -20,8 +20,8 @@
 - **UI 组件**: shadcn/ui (基于 Radix UI)
 - **Styling**: Tailwind CSS 4
 - **Database**: Supabase (PostgreSQL)
-- **Audio Processing**: coze-coding-dev-sdk (ASR)
-- **Translation**: coze-coding-dev-sdk (LLM)
+- **Audio Processing**: OpenAI Whisper
+- **Translation**: DeepL API
 - **Drag & Drop**: @dnd-kit/core, @dnd-kit/sortable
 
 ## 数据库结构
@@ -92,7 +92,6 @@ parts (Part 1/2/3 分类)
 │   └── storage/database/  
 │       ├── shared/schema.ts      # Drizzle Schema
 │       └── supabase-client.ts    # Supabase客户端
-└── .coze                  # Coze配置文件
 ```
 
 ## API 端点

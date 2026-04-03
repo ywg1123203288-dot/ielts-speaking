@@ -20,7 +20,6 @@ export const metadata: Metadata = {
     '翻译',
   ],
   authors: [{ name: 'IELTS Study Team' }],
-  generator: 'Coze Code',
   openGraph: {
     title: 'IELTS 口语素材库',
     description:
@@ -39,7 +38,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const isDev = process.env.COZE_PROJECT_ENV === 'DEV';
+  const isDev = process.env.NODE_ENV === 'development';
 
   return (
     <html lang="zh-CN">

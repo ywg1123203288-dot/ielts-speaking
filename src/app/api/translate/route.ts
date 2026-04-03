@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { LLMClient, Config, HeaderUtils } from 'coze-coding-dev-sdk';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 export async function POST(request: NextRequest) {
@@ -14,28 +13,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 使用LLM客户端翻译
-    const config = new Config();
-    const customHeaders = HeaderUtils.extractForwardHeaders(request.headers);
-    const client = new LLMClient(config, customHeaders);
+    // 使用 DeepL API 翻译
+    const deeplApiKey = process.env.DEEPL_API_KEY;
 
-    const messages = [
-      {
-        role: 'system' as const,
-        content: '你是一个专业的翻译助手。请将用户提供的英文文本翻译成中文，要求翻译准确、流畅、符合中文表达习惯。只返回翻译结果，不要添加任何解释或说明。'
+    if (!deeplApiKey) {
+      return NextResponse.json(
+        { success: false, error: 'DeepL API 未配置' },
+        { status: 500 }
+      );
+    }
+
+    console.log('调用 DeepL 翻译...');
+
+    const deeplResponse = await fetch('https://api-free.deepl.com/v2/translate', {
+      method: 'POST',
+      headers: {
+        'Authorization': `DeepL-Auth-Key ${deeplApiKey}`,
+        'Content-Type': 'application/json',
       },
-      {
-        role: 'user' as const,
-        content: text
-      }
-    ];
-
-    const response = await client.invoke(messages, {
-      model: 'doubao-seed-1-6-lite-251015',
-      temperature: 0.3
+      body: JSON.stringify({
+        text: [text],
+        source_lang: 'EN',
+        target_lang: 'ZH',
+      }),
     });
 
-    const translation = response.content;
+    if (!deeplResponse.ok) {
+      const errorText = await deeplResponse.text();
+      console.error('DeepL API 错误:', errorText);
+      throw new Error(`DeepL API 请求失败: ${deeplResponse.status}`);
+    }
+
+    const deeplResult = await deeplResponse.json();
+    const translation = deeplResult.translations[0]?.text || '';
+
+    console.log('翻译结果:', translation.substring(0, 50) + '...');
 
     // 更新数据库
     const supabaseClient = getSupabaseClient();

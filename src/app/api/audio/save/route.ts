@@ -1,15 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { S3Storage } from 'coze-coding-dev-sdk';
+import {
+  S3Client,
+  PutObjectCommand,
+} from '@aws-sdk/client-s3';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
-// 初始化对象存储
-const storage = new S3Storage({
-  endpointUrl: process.env.COZE_BUCKET_ENDPOINT_URL,
-  accessKey: "",
-  secretKey: "",
-  bucketName: process.env.COZE_BUCKET_NAME,
-  region: "cn-beijing",
+// 初始化 R2/S3 客户端
+const r2Client = new S3Client({
+  region: 'auto',
+  endpoint: `https://${process.env.CF_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.CF_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.CF_SECRET_ACCESS_KEY || '',
+  },
 });
+
+// 上传文件到 R2
+async function uploadToR2(fileBuffer: Buffer, key: string, contentType: string): Promise<string> {
+  await r2Client.send(
+    new PutObjectCommand({
+      Bucket: process.env.CF_BUCKET_NAME,
+      Key: key,
+      Body: fileBuffer,
+      ContentType: contentType,
+    })
+  );
+
+  // R2 公开访问 URL
+  return `https://${process.env.CF_PUBLIC_BUCKET_DOMAIN}/${key}`;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,24 +45,15 @@ export async function POST(request: NextRequest) {
 
     console.log('保存音频文件...', { questionId, fileName: audioFile.name, size: audioFile.size });
 
-    // 将音频文件转换为Buffer
+    // 将音频文件转换为 Buffer
     const arrayBuffer = await audioFile.arrayBuffer();
     const fileBuffer = Buffer.from(arrayBuffer);
 
-    // 上传到对象存储
+    // 上传到 R2
     const timestamp = Date.now();
     const sanitizedFileName = audioFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const audioKey = await storage.uploadFile({
-      fileContent: fileBuffer,
-      fileName: `ielts-audio/${questionId}/${timestamp}_${sanitizedFileName}`,
-      contentType: audioFile.type || 'audio/mpeg',
-    });
-    
-    // 生成可访问的URL（有效期30天）
-    const audioUrl = await storage.generatePresignedUrl({
-      key: audioKey,
-      expireTime: 2592000, // 30天
-    });
+    const audioKey = `ielts-audio/${questionId}/${timestamp}_${sanitizedFileName}`;
+    const audioUrl = await uploadToR2(fileBuffer, audioKey, audioFile.type || 'audio/mpeg');
 
     console.log('音频上传成功，保存到数据库...');
 
