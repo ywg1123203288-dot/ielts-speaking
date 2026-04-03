@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
-// 初始化 OpenAI 客户端
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// 智能拆分句子并估算时间戳
+// 智能拆分句子并估算时间戳（当 Deepgram 没有返回精确时间戳时使用）
 function splitIntoSentences(text: string, duration: number): Array<{ text: string; start: number; end: number }> {
   console.log('拆分文本:', text.substring(0, 100) + '...', '时长:', duration);
 
@@ -105,19 +99,38 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await audioResponse.arrayBuffer();
     const fileBuffer = Buffer.from(arrayBuffer);
 
-    // 使用 Whisper 转写
-    console.log('开始 Whisper 转写...');
+    // 使用 Deepgram 转写
+    console.log('开始 Deepgram 转写...');
 
-    const fileName = `retry_${Date.now()}_audio.webm`;
-    const whisperFile = new File([fileBuffer], fileName, { type: 'audio/webm' });
-
-    const transcription = await openai.audio.transcriptions.create({
-      file: whisperFile,
-      model: 'whisper-1',
+    const deepgramResponse = await fetch('https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&punctuate=true&timestamps=true', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
+        'Content-Type': 'audio/webm',
+      },
+      body: fileBuffer,
     });
 
-    const resultText = transcription.text;
-    console.log('Whisper 结果:', resultText?.substring(0, 100));
+    if (!deepgramResponse.ok) {
+      const errorText = await deepgramResponse.text();
+      console.error('Deepgram API 错误:', errorText);
+      throw new Error(`Deepgram API 请求失败: ${deepgramResponse.status}`);
+    }
+
+    const deepgramResult = await deepgramResponse.json();
+    const result = deepgramResult.results?.channels?.[0]?.alternatives?.[0];
+
+    if (!result) {
+      return NextResponse.json(
+        { success: false, error: '转写失败：未识别到语音内容' },
+        { status: 500 }
+      );
+    }
+
+    const resultText = result.transcript || '';
+    const words = result.words || [];
+
+    console.log('Deepgram 结果:', resultText?.substring(0, 100));
 
     if (!resultText) {
       return NextResponse.json(
@@ -129,13 +142,56 @@ export async function POST(request: NextRequest) {
     // 获取音频时长
     let duration = parseFloat(audioDuration) || 0;
     if (duration <= 0) {
-      duration = 60; // 默认 60 秒
+      duration = 60;
     }
     console.log('使用的音频时长:', duration, '秒');
 
-    // 使用 fallback 算法拆分句子并估算时间戳
-    const sentences = splitIntoSentences(resultText, duration);
-    console.log('使用智能算法拆分，句子数:', sentences.length);
+    // 构造时间戳句子数组
+    let sentences: Array<{ text: string; start: number; end: number }>;
+
+    // 如果 Deepgram 返回了 word-level timestamps，按句子分组
+    if (words.length > 0) {
+      const sentenceMap = new Map<number, { text: string; start: number; end: number }>();
+
+      words.forEach((word: { word: string; start: number; end: number }) => {
+        const startSec = word.start;
+        const sentenceKey = Math.floor(startSec / (duration / 10));
+        const existing = sentenceMap.get(sentenceKey);
+
+        if (existing) {
+          existing.text += ' ' + word.word;
+          existing.end = word.end;
+        } else {
+          sentenceMap.set(sentenceKey, {
+            text: word.word,
+            start: startSec,
+            end: word.end,
+          });
+        }
+      });
+
+      sentences = Array.from(sentenceMap.values()).map((s, index, arr) => {
+        const text = s.text.trim();
+        const start = s.start;
+        const end = index < arr.length - 1 ? arr[index + 1].start : s.end;
+        return { text, start, end };
+      }).filter((s, index, arr) => {
+        if (index === 0) return true;
+        const prev = arr[index - 1];
+        return s.start - prev.end < 0.5;
+      });
+
+      sentences = sentences.map((s, i, arr) => ({
+        text: s.text,
+        start: s.start,
+        end: i < arr.length - 1 ? arr[i + 1].start : duration,
+      }));
+
+      console.log('使用 Deepgram timestamps 拆分，句子数:', sentences.length);
+    } else {
+      sentences = splitIntoSentences(resultText, duration);
+      console.log('使用智能算法拆分，句子数:', sentences.length);
+    }
 
     // 更新数据库
     const { error: updateError } = await supabaseClient
