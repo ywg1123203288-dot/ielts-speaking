@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
-// 智能拆分句子并估算时间戳（当 Deepgram 没有返回精确时间戳时使用）
+// 智能拆分句子并估算时间戳
 function splitIntoSentences(text: string, duration: number): Array<{ text: string; start: number; end: number }> {
   console.log('拆分文本:', text.substring(0, 100) + '...', '时长:', duration);
 
@@ -53,6 +53,54 @@ function splitIntoSentences(text: string, duration: number): Array<{ text: strin
       sentence.end = safeDuration;
     }
   });
+
+  return sentences;
+}
+
+// 将 word-level timestamps 合并成句子
+function mergeWordsToSentences(words: Array<{ word: string; start: number; end: number }>): Array<{ text: string; start: number; end: number }> {
+  if (!words || words.length === 0) return [];
+
+  const sentences: Array<{ text: string; start: number; end: number }> = [];
+  let currentSentence = {
+    words: [] as Array<{ word: string; start: number; end: number }>,
+    start: 0,
+    end: 0
+  };
+
+  const isEndPunctuation = (word: string) => /[.!?]$/.test(word.trim());
+
+  for (const wordObj of words) {
+    currentSentence.words.push(wordObj);
+    currentSentence.end = wordObj.end;
+
+    // 如果遇到句末标点，开始新句子
+    if (isEndPunctuation(wordObj.word)) {
+      const text = currentSentence.words.map(w => w.word).join('').trim();
+      sentences.push({
+        text,
+        start: currentSentence.words[0].start,
+        end: currentSentence.end
+      });
+      currentSentence = {
+        words: [],
+        start: 0,
+        end: 0
+      };
+    }
+  }
+
+  // 处理最后剩余的词
+  if (currentSentence.words.length > 0) {
+    const text = currentSentence.words.map(w => w.word).join('').trim();
+    if (text) {
+      sentences.push({
+        text,
+        start: currentSentence.words[0].start,
+        end: currentSentence.end || currentSentence.words[currentSentence.words.length - 1].end
+      });
+    }
+  }
 
   return sentences;
 }
@@ -149,48 +197,19 @@ export async function POST(request: NextRequest) {
     // 构造时间戳句子数组
     let sentences: Array<{ text: string; start: number; end: number }>;
 
-    // 如果 Deepgram 返回了 word-level timestamps，按句子分组
+    // 如果 Deepgram 返回了 word-level timestamps，按句子合并
     if (words.length > 0) {
-      const sentenceMap = new Map<number, { text: string; start: number; end: number }>();
-
-      words.forEach((word: { word: string; start: number; end: number }) => {
-        const startSec = word.start;
-        const sentenceKey = Math.floor(startSec / (duration / 10));
-        const existing = sentenceMap.get(sentenceKey);
-
-        if (existing) {
-          existing.text += ' ' + word.word;
-          existing.end = word.end;
-        } else {
-          sentenceMap.set(sentenceKey, {
-            text: word.word,
-            start: startSec,
-            end: word.end,
-          });
-        }
-      });
-
-      sentences = Array.from(sentenceMap.values()).map((s, index, arr) => {
-        const text = s.text.trim();
-        const start = s.start;
-        const end = index < arr.length - 1 ? arr[index + 1].start : s.end;
-        return { text, start, end };
-      }).filter((s, index, arr) => {
-        if (index === 0) return true;
-        const prev = arr[index - 1];
-        return s.start - prev.end < 0.5;
-      });
-
-      sentences = sentences.map((s, i, arr) => ({
-        text: s.text,
-        start: s.start,
-        end: i < arr.length - 1 ? arr[i + 1].start : duration,
-      }));
-
+      sentences = mergeWordsToSentences(words);
       console.log('使用 Deepgram timestamps 拆分，句子数:', sentences.length);
     } else {
       sentences = splitIntoSentences(resultText, duration);
       console.log('使用智能算法拆分，句子数:', sentences.length);
+    }
+
+    // 如果合并后句子太少（少于2个），使用智能拆分
+    if (sentences.length < 2) {
+      sentences = splitIntoSentences(resultText, duration);
+      console.log('句子太少，使用智能算法拆分，句子数:', sentences.length);
     }
 
     // 更新数据库
