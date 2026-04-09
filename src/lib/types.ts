@@ -40,6 +40,7 @@ export interface Question {
   english_transcript?: string;
   chinese_translation?: string;
   sentences?: TimestampedSentence[];
+  note?: string;
   order: number;
   created_at: string;
   updated_at?: string;

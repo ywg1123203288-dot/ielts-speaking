@@ -70,6 +70,7 @@ export const questions = pgTable(
 			start: number;
 			end: number;
 		}>>(), // 时间戳句子数组
+		note: text("note"), // 用户笔记
 		order: integer("order").notNull().default(1),
 		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 		updatedAt: timestamp("updated_at", { withTimezone: true }),

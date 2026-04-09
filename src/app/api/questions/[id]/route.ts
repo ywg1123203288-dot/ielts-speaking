@@ -1,6 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const client = getSupabaseClient();
+    const { id } = await params;
+
+    const { data, error } = await client
+      .from('questions')
+      .select()
+      .eq('id', parseInt(id))
+      .single();
+
+    if (error) throw new Error(`获取失败: ${error.message}`);
+
+    return NextResponse.json({ success: true, data });
+  } catch (error) {
+    console.error('获取Question失败:', error);
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : '未知错误' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -44,6 +70,7 @@ export async function PUT(
     if (body.english_transcript !== undefined) updateData.english_transcript = body.english_transcript;
     if (body.chinese_translation !== undefined) updateData.chinese_translation = body.chinese_translation;
     if (body.sentences !== undefined) updateData.sentences = body.sentences;
+    if (body.note !== undefined) updateData.note = body.note;
     
     const { data, error } = await client
       .from('questions')
@@ -51,9 +78,9 @@ export async function PUT(
       .eq('id', parseInt(id))
       .select()
       .single();
-    
+
     if (error) throw new Error(`更新失败: ${error.message}`);
-    
+
     return NextResponse.json({ success: true, data });
   } catch (error) {
     console.error('更新Question失败:', error);

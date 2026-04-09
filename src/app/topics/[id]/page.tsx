@@ -5,11 +5,11 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
-  Headphones, 
-  ChevronLeft, 
-  Plus, 
-  Trash2, 
+import {
+  Headphones,
+  ChevronLeft,
+  Plus,
+  Trash2,
   MessageCircle,
   Upload,
   Play,
@@ -23,7 +23,8 @@ import {
   Check,
   X,
   Save,
-  ChevronRight
+  ChevronRight,
+  StickyNote
 } from 'lucide-react';
 import { TopicWithCards, CardWithQuestions, Question, TimestampedSentence } from '@/lib/types';
 import {
@@ -58,14 +59,38 @@ export default function TopicPage() {
   const [newQuestionCardId, setNewQuestionCardId] = useState<number | null>(null);
   const [newQuestionContent, setNewQuestionContent] = useState('');
   const [expandedQuestionId, setExpandedQuestionId] = useState<number | null>(null);
-  
+
   // 话题名称编辑状态
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState('');
-  
+
   // 卡片名称编辑状态
   const [editingCardId, setEditingCardId] = useState<number | null>(null);
   const [editCardTitle, setEditCardTitle] = useState('');
+
+  // 精准更新单个 question，不触发全页刷新
+  const updateQuestionInState = (updatedQuestion: Question) => {
+    setCards(prevCards =>
+      prevCards.map(card => {
+        if (!card.questions) return card;
+        const questionIndex = card.questions.findIndex(q => q.id === updatedQuestion.id);
+        if (questionIndex === -1) return card;
+        const newQuestions = [...card.questions];
+        newQuestions[questionIndex] = updatedQuestion;
+        return { ...card, questions: newQuestions };
+      })
+    );
+  };
+
+  // 精准删除单个 question，不触发全页刷新
+  const deleteQuestionInState = (questionId: number) => {
+    setCards(prevCards =>
+      prevCards.map(card => {
+        if (!card.questions) return card;
+        return { ...card, questions: card.questions.filter(q => q.id !== questionId) };
+      })
+    );
+  };
 
   // 获取话题详情
   const fetchTopicData = () => {
@@ -511,11 +536,12 @@ export default function TopicPage() {
                           >
                             <div className="space-y-2">
                               {card.questions.map((question: any, index: number) => (
-                                <SortableQuestionItem 
-                                  key={question.id} 
-                                  question={question} 
+                                <SortableQuestionItem
+                                  key={question.id}
+                                  question={question}
                                   index={index}
-                                  onUpdate={fetchTopicData}
+                                  onQuestionUpdate={updateQuestionInState}
+                                  onQuestionDelete={deleteQuestionInState}
                                   isExpanded={expandedQuestionId === question.id}
                                   onToggleExpand={() => {
                                     setExpandedQuestionId(
@@ -686,16 +712,18 @@ function SortableCard({
 }
 
 // 可排序的问题项组件
-function SortableQuestionItem({ 
-  question, 
-  index, 
-  onUpdate,
+function SortableQuestionItem({
+  question,
+  index,
+  onQuestionUpdate,
+  onQuestionDelete,
   isExpanded,
-  onToggleExpand 
-}: { 
-  question: Question; 
-  index: number; 
-  onUpdate?: () => void;
+  onToggleExpand
+}: {
+  question: Question;
+  index: number;
+  onQuestionUpdate?: (question: Question) => void;
+  onQuestionDelete?: (questionId: number) => void;
   isExpanded: boolean;
   onToggleExpand: () => void;
 }) {
@@ -717,11 +745,12 @@ function SortableQuestionItem({
 
   return (
     <div ref={setNodeRef} style={style}>
-      <QuestionItem 
-        question={question} 
-        index={index} 
-        dragHandleProps={{ attributes, listeners }} 
-        onUpdate={onUpdate}
+      <QuestionItem
+        question={question}
+        index={index}
+        dragHandleProps={{ attributes, listeners }}
+        onQuestionUpdate={onQuestionUpdate}
+        onQuestionDelete={onQuestionDelete}
         isExpanded={isExpanded}
         onToggleExpand={onToggleExpand}
       />
@@ -730,18 +759,20 @@ function SortableQuestionItem({
 }
 
 // 问题组件
-function QuestionItem({ 
-  question, 
+function QuestionItem({
+  question,
   index,
   dragHandleProps,
-  onUpdate,
+  onQuestionUpdate,
+  onQuestionDelete,
   isExpanded,
   onToggleExpand
-}: { 
-  question: Question; 
+}: {
+  question: Question;
   index: number;
   dragHandleProps?: { attributes: any; listeners: any };
-  onUpdate?: () => void;
+  onQuestionUpdate?: (question: Question) => void;
+  onQuestionDelete?: (questionId: number) => void;
   isExpanded: boolean;
   onToggleExpand: () => void;
 }) {
@@ -761,6 +792,9 @@ function QuestionItem({
   const [editingSentenceIndex, setEditingSentenceIndex] = useState<number | null>(null);
   const [editStartTime, setEditStartTime] = useState('');
   const [editEndTime, setEditEndTime] = useState('');
+  const [note, setNote] = useState(question.note || '');
+  const [showNote, setShowNote] = useState(false);
+  const [isSavingNote, setIsSavingNote] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
@@ -891,7 +925,12 @@ function QuestionItem({
       const result = await response.json();
       if (result.success) {
         setSaved(true);
-        onUpdate?.();
+        // 精准更新：重新获取该 question 的最新数据
+        const qRes = await fetch(`/api/questions/${questionId}`);
+        const qData = await qRes.json();
+        if (qData.success && qData.data) {
+          onQuestionUpdate?.(qData.data);
+        }
       } else {
         setError(result.error || '转写失败');
       }
@@ -923,7 +962,12 @@ function QuestionItem({
 
       const result = await response.json();
       if (result.success) {
-        onUpdate?.();
+        // 精准更新：直接使用返回的翻译数据
+        const updatedQuestion = {
+          ...question,
+          chinese_translation: result.data.translation
+        };
+        onQuestionUpdate?.(updatedQuestion);
       } else {
         setError(result.error || '翻译失败');
       }
@@ -963,7 +1007,13 @@ function QuestionItem({
       const result = await response.json();
       if (result.success) {
         console.log('重新转写成功，句子数:', result.data.sentences?.length);
-        onUpdate?.();
+        // 精准更新：合并返回的数据
+        const updatedQuestion = {
+          ...question,
+          english_transcript: result.data.text,
+          sentences: result.data.sentences
+        };
+        onQuestionUpdate?.(updatedQuestion);
       } else {
         setError(result.error || '转写失败');
       }
@@ -1126,8 +1176,8 @@ function QuestionItem({
         body: JSON.stringify({ sentences: newSentences })
       });
       const result = await response.json();
-      if (result.success) {
-        onUpdate?.();
+      if (result.success && result.data) {
+        onQuestionUpdate?.(result.data);
         setEditingSentenceIndex(null);
       } else {
         setError('保存失败');
@@ -1135,6 +1185,26 @@ function QuestionItem({
     } catch (err) {
       console.error('保存时间戳失败:', err);
       setError('保存失败');
+    }
+  };
+
+  // 保存笔记
+  const saveNote = async () => {
+    setIsSavingNote(true);
+    try {
+      const response = await fetch(`/api/questions/${questionId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note })
+      });
+      const result = await response.json();
+      if (result.success && result.data) {
+        onQuestionUpdate?.(result.data);
+      }
+    } catch (err) {
+      console.error('保存笔记失败:', err);
+    } finally {
+      setIsSavingNote(false);
     }
   };
 
@@ -1173,7 +1243,9 @@ function QuestionItem({
       const result = await response.json();
       if (result.success) {
         setIsEditing(false);
-        onUpdate?.();
+        if (result.data) {
+          onQuestionUpdate?.(result.data);
+        }
       } else {
         setError(result.error || '更新失败');
       }
@@ -1189,7 +1261,8 @@ function QuestionItem({
       const response = await fetch(`/api/questions/${questionId}`, { method: 'DELETE' });
       const result = await response.json();
       if (result.success) {
-        onUpdate?.();
+        // 精准删除：直接从本地 state 移除
+        onQuestionDelete?.(questionId);
       } else {
         setError(result.error || '删除失败');
       }
@@ -1310,6 +1383,18 @@ function QuestionItem({
                 className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-lg"
               >
                 <Trash2 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowNote(!showNote);
+                }}
+                className={`rounded-lg ${showNote ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}`}
+                title="笔记"
+              >
+                <StickyNote className="h-4 w-4" />
               </Button>
             </>
           )}
@@ -1555,6 +1640,64 @@ function QuestionItem({
                   <div className="mt-3">
                     <h4 className="text-sm font-medium text-muted-foreground mb-2">中文翻译</h4>
                     <p className="text-foreground">{question.chinese_translation}</p>
+                  </div>
+                )}
+
+                {/* 笔记面板 */}
+                {showNote && (
+                  <div className="mt-4 border-t border-border pt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-medium text-muted-foreground">笔记</h4>
+                      <div className="flex items-center gap-2">
+                        {isSavingNote && (
+                          <span className="text-xs text-muted-foreground">保存中...</span>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setShowNote(false)}
+                          className="h-6 w-6 rounded-lg text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      {/* 左侧：英文转录句子（可点击播放） */}
+                      <div className="w-1/2 border border-border rounded-xl p-3 max-h-48 overflow-y-auto bg-background/50">
+                        {question.sentences && question.sentences.length > 0 ? (
+                          <div className="space-y-1">
+                            {question.sentences.map((sentence, sentenceIndex) => (
+                              <button
+                                key={sentenceIndex}
+                                onClick={() => playSentence(sentence, sentenceIndex)}
+                                className={`w-full text-left px-2 py-1.5 rounded-lg text-sm transition-all ${
+                                  currentSentenceIndex === sentenceIndex
+                                    ? 'bg-gradient-to-r from-macaron-pink/20 via-macaron-mint/20 to-macaron-lavender/20 border-l-4 border-macaron-pink'
+                                    : 'hover:bg-muted'
+                                }`}
+                              >
+                                {sentence.text}
+                              </button>
+                            ))}
+                          </div>
+                        ) : question.english_transcript ? (
+                          <p className="text-sm text-foreground">{question.english_transcript}</p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">暂无转录内容</p>
+                        )}
+                      </div>
+                      {/* 右侧：笔记输入框 */}
+                      <div className="w-1/2">
+                        <textarea
+                          value={note}
+                          onChange={(e) => setNote(e.target.value)}
+                          onBlur={saveNote}
+                          placeholder="添加笔记..."
+                          className="w-full h-32 rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
