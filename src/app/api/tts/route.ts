@@ -25,9 +25,9 @@ async function uploadToR2(fileBuffer: Buffer, key: string, contentType: string):
 
 // 音色映射
 const VOICE_MAP: Record<string, string> = {
-  en_uk_male: 'wyWA56cQNU2KqUW4eCsI',
+  en_uk_male: 'goT3UYdM9bhm0n2lmKQx',
   en_uk_female: '19STyYD15bswVz51nqLf',
-  en_us_male: 'dtSEYcGNJqjrtBArPCVZ',
+  en_us_male: 'MFZUKuGQUsGJPQjTS4wC',
   en_us_female: 'OYTbf65OHHFELVut7v2H',
 };
 
