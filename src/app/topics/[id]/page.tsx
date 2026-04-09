@@ -1528,108 +1528,125 @@ function QuestionItem({
                   </Button>
                 </div>
 
-                {/* 英文原文 - 可点击句子 */}
+                {/* 英文原文 + 笔记（横向并排时） */}
                 {question.english_transcript && (
                   <div className="mt-3">
-                    <h4 className="text-sm font-medium text-muted-foreground mb-2">英文原文（点击句子跳转播放，点击时间可微调）</h4>
-                    <div className="space-y-1">
-                      {question.sentences && question.sentences.length > 0 ? (
-                        question.sentences.map((sentence, sentenceIndex) => (
-                          <div
-                            key={sentenceIndex}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
-                              currentSentenceIndex === sentenceIndex
-                                ? 'bg-gradient-to-r from-macaron-pink/20 via-macaron-mint/20 to-macaron-lavender/20 border-l-4 border-macaron-pink shadow-sm'
-                                : 'hover:bg-muted'
-                            }`}
-                          >
-                            {/* 时间戳 - 可编辑 */}
-                            {editingSentenceIndex === sentenceIndex ? (
-                              <div className="flex items-center gap-1 shrink-0 text-xs">
-                                {/* 开始时间调整 */}
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setEditStartTime((parseFloat(editStartTime) - 0.1).toFixed(1)); }}
-                                  className="px-1 py-0.5 rounded bg-muted hover:bg-destructive/20 text-muted-foreground"
-                                  title="减少0.1秒"
-                                >
-                                  -
-                                </button>
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  value={editStartTime}
-                                  onChange={(e) => setEditStartTime(e.target.value)}
-                                  className="w-12 px-1 py-0.5 rounded border bg-background text-center"
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setEditStartTime((parseFloat(editStartTime) + 0.1).toFixed(1)); }}
-                                  className="px-1 py-0.5 rounded bg-muted hover:bg-green-100 text-muted-foreground"
-                                  title="增加0.1秒"
-                                >
-                                  +
-                                </button>
-                                <span className="mx-1">-</span>
-                                {/* 结束时间调整 */}
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setEditEndTime((parseFloat(editEndTime) - 0.1).toFixed(1)); }}
-                                  className="px-1 py-0.5 rounded bg-muted hover:bg-destructive/20 text-muted-foreground"
-                                  title="减少0.1秒"
-                                >
-                                  -
-                                </button>
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  value={editEndTime}
-                                  onChange={(e) => setEditEndTime(e.target.value)}
-                                  className="w-12 px-1 py-0.5 rounded border bg-background text-center"
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setEditEndTime((parseFloat(editEndTime) + 0.1).toFixed(1)); }}
-                                  className="px-1 py-0.5 rounded bg-muted hover:bg-green-100 text-muted-foreground"
-                                  title="增加0.1秒"
-                                >
-                                  +
-                                </button>
-                                <span className="s">s</span>
-                                {/* 保存/取消按钮 */}
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); saveSentenceTimestamp(); }}
-                                  className="ml-1 p-1 rounded text-green-600 hover:bg-green-50"
-                                  title="保存"
-                                >
-                                  <Check className="h-3 w-3" />
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setEditingSentenceIndex(null); }}
-                                  className="p-1 rounded text-muted-foreground hover:bg-muted"
-                                  title="取消"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </div>
-                            ) : (
-                              <span
-                                onClick={(e) => { e.stopPropagation(); startEditSentence(sentenceIndex); }}
-                                className="text-[10px] text-muted-foreground/60 hover:text-primary cursor-pointer shrink-0 font-mono px-1"
-                                title="点击调整时间戳"
-                              >
-                                {sentence.start.toFixed(1)}-{sentence.end.toFixed(1)}s
-                              </span>
-                            )}
-                            {/* 句子文本 - 点击播放 */}
-                            <button
-                              onClick={() => playSentence(sentence, sentenceIndex)}
-                              className="flex-1 text-left text-foreground"
+                    <h4 className="text-sm font-medium text-muted-foreground mb-2">
+                      {showNote ? '英文原文（点击句子跳转播放）' : '英文原文（点击句子跳转播放，点击时间可微调）'}
+                    </h4>
+                    <div className={`flex gap-3 ${showNote ? '' : ''}`}>
+                      {/* 左侧：英文转录句子 */}
+                      <div className={`${showNote ? 'w-1/2' : 'w-full'} space-y-1`}>
+                        {question.sentences && question.sentences.length > 0 ? (
+                          question.sentences.map((sentence, sentenceIndex) => (
+                            <div
+                              key={sentenceIndex}
+                              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+                                currentSentenceIndex === sentenceIndex
+                                  ? 'bg-gradient-to-r from-macaron-pink/20 via-macaron-mint/20 to-macaron-lavender/20 border-l-4 border-macaron-pink shadow-sm'
+                                  : 'hover:bg-muted'
+                              }`}
                             >
-                              {sentence.text}
-                            </button>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-foreground">{question.english_transcript}</p>
+                              {/* 时间戳 - 可编辑（笔记关闭时显示） */}
+                              {!showNote && (
+                                editingSentenceIndex === sentenceIndex ? (
+                                  <div className="flex items-center gap-1 shrink-0 text-xs">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setEditStartTime((parseFloat(editStartTime) - 0.1).toFixed(1)); }}
+                                      className="px-1 py-0.5 rounded bg-muted hover:bg-destructive/20 text-muted-foreground"
+                                      title="减少0.1秒"
+                                    >
+                                      -
+                                    </button>
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      value={editStartTime}
+                                      onChange={(e) => setEditStartTime(e.target.value)}
+                                      className="w-12 px-1 py-0.5 rounded border bg-background text-center"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setEditStartTime((parseFloat(editStartTime) + 0.1).toFixed(1)); }}
+                                      className="px-1 py-0.5 rounded bg-muted hover:bg-green-100 text-muted-foreground"
+                                      title="增加0.1秒"
+                                    >
+                                      +
+                                    </button>
+                                    <span className="mx-1">-</span>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setEditEndTime((parseFloat(editEndTime) - 0.1).toFixed(1)); }}
+                                      className="px-1 py-0.5 rounded bg-muted hover:bg-destructive/20 text-muted-foreground"
+                                      title="减少0.1秒"
+                                    >
+                                      -
+                                    </button>
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      value={editEndTime}
+                                      onChange={(e) => setEditEndTime(e.target.value)}
+                                      className="w-12 px-1 py-0.5 rounded border bg-background text-center"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setEditEndTime((parseFloat(editEndTime) + 0.1).toFixed(1)); }}
+                                      className="px-1 py-0.5 rounded bg-muted hover:bg-green-100 text-muted-foreground"
+                                      title="增加0.1秒"
+                                    >
+                                      +
+                                    </button>
+                                    <span>s</span>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); saveSentenceTimestamp(); }}
+                                      className="ml-1 p-1 rounded text-green-600 hover:bg-green-50"
+                                      title="保存"
+                                    >
+                                      <Check className="h-3 w-3" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setEditingSentenceIndex(null); }}
+                                      className="p-1 rounded text-muted-foreground hover:bg-muted"
+                                      title="取消"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span
+                                    onClick={(e) => { e.stopPropagation(); startEditSentence(sentenceIndex); }}
+                                    className="text-[10px] text-muted-foreground/60 hover:text-primary cursor-pointer shrink-0 font-mono px-1"
+                                    title="点击调整时间戳"
+                                  >
+                                    {sentence.start.toFixed(1)}-{sentence.end.toFixed(1)}s
+                                  </span>
+                                )
+                              )}
+                              {/* 句子文本 - 点击播放 */}
+                              <button
+                                onClick={() => playSentence(sentence, sentenceIndex)}
+                                className="flex-1 text-left text-foreground"
+                              >
+                                {sentence.text}
+                              </button>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-foreground">{question.english_transcript}</p>
+                        )}
+                      </div>
+
+                      {/* 右侧：笔记（仅笔记展开时显示） */}
+                      {showNote && (
+                        <div className="w-1/2">
+                          <textarea
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                            onBlur={saveNote}
+                            placeholder="添加笔记..."
+                            className="w-full h-full min-h-32 rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                          />
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1640,64 +1657,6 @@ function QuestionItem({
                   <div className="mt-3">
                     <h4 className="text-sm font-medium text-muted-foreground mb-2">中文翻译</h4>
                     <p className="text-foreground">{question.chinese_translation}</p>
-                  </div>
-                )}
-
-                {/* 笔记面板 */}
-                {showNote && (
-                  <div className="mt-4 border-t border-border pt-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-medium text-muted-foreground">笔记</h4>
-                      <div className="flex items-center gap-2">
-                        {isSavingNote && (
-                          <span className="text-xs text-muted-foreground">保存中...</span>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setShowNote(false)}
-                          className="h-6 w-6 rounded-lg text-muted-foreground hover:text-foreground"
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="flex gap-3">
-                      {/* 左侧：英文转录句子（可点击播放） */}
-                      <div className="w-1/2 border border-border rounded-xl p-3 max-h-48 overflow-y-auto bg-background/50">
-                        {question.sentences && question.sentences.length > 0 ? (
-                          <div className="space-y-1">
-                            {question.sentences.map((sentence, sentenceIndex) => (
-                              <button
-                                key={sentenceIndex}
-                                onClick={() => playSentence(sentence, sentenceIndex)}
-                                className={`w-full text-left px-2 py-1.5 rounded-lg text-sm transition-all ${
-                                  currentSentenceIndex === sentenceIndex
-                                    ? 'bg-gradient-to-r from-macaron-pink/20 via-macaron-mint/20 to-macaron-lavender/20 border-l-4 border-macaron-pink'
-                                    : 'hover:bg-muted'
-                                }`}
-                              >
-                                {sentence.text}
-                              </button>
-                            ))}
-                          </div>
-                        ) : question.english_transcript ? (
-                          <p className="text-sm text-foreground">{question.english_transcript}</p>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">暂无转录内容</p>
-                        )}
-                      </div>
-                      {/* 右侧：笔记输入框 */}
-                      <div className="w-1/2">
-                        <textarea
-                          value={note}
-                          onChange={(e) => setNote(e.target.value)}
-                          onBlur={saveNote}
-                          placeholder="添加笔记..."
-                          className="w-full h-32 rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                        />
-                      </div>
-                    </div>
                   </div>
                 )}
               </div>
