@@ -1591,8 +1591,8 @@ function QuestionItem({
               </div>
             )}
 
-            {/* 音频上传或播放 */}
-            {!audioUrl ? (
+            {/* 音频上传或播放 - STT 模式且无音频时显示 */}
+            {mode === 'stt' && !audioUrl ? (
               <div
                 className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
                 onClick={() => document.getElementById(`audio-upload-${questionId}`)?.click()}
@@ -1629,7 +1629,7 @@ function QuestionItem({
                   </Button>
                   <audio
                     ref={audioRef}
-                    src={audioUrl}
+                    src={audioUrl || undefined}
                     className="flex-1 h-8"
                     controls
                   />
