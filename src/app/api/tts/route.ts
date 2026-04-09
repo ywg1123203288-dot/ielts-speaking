@@ -58,11 +58,16 @@ export async function POST(request: NextRequest) {
     });
     
     if (!response.ok) {
-      throw new Error(`ElevenLabs API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('ElevenLabs API error:', response.status, errorText);
+      return NextResponse.json(
+        { success: false, error: `ElevenLabs API error: ${response.status}` },
+        { status: 500 }
+      );
     }
-    
+
     const audioBuffer = Buffer.from(await response.arrayBuffer());
-    
+
     // 上传到 R2
     const key = `ielts-tts/${Date.now()}.webm`;
     const audioUrl = await uploadToR2(audioBuffer, key, 'audio/webm');
@@ -70,6 +75,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, data: { audioUrl } });
   } catch (error) {
     console.error('TTS error:', error);
-    return NextResponse.json({ success: false, error: '生成失败' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : '生成失败' },
+      { status: 500 }
+    );
   }
 }
