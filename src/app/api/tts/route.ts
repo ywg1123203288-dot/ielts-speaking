@@ -25,10 +25,10 @@ async function uploadToR2(fileBuffer: Buffer, key: string, contentType: string):
 
 // 音色映射
 const VOICE_MAP: Record<string, string> = {
-  en_uk_male: 'goT3UYdM9bhm0n2lmKQx',
-  en_uk_female: '19STyYD15bswVz51nqLf',
-  en_us_male: 'MFZUKuGQUsGJPQjTS4wC',
-  en_us_female: 'OYTbf65OHHFELVut7v2H',
+  en_uk_male: 'ErXwobaYiN019PkySvjV',
+  en_uk_female: '21m00Tcm4TlvDq8ikWAM',
+  en_us_male: 'pNInz6obpgDQGcFmaJgB',
+  en_us_female: 'EXAVITQu4vr4xnSDxMaL',
 };
 
 export async function POST(request: NextRequest) {
