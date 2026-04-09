@@ -1,0 +1,20 @@
+[
+  {
+    "id": "task_001",
+    "name": "创建 TTS API 路由（调用 ElevenLabs）",
+    "status": true,
+    "description": "创建 /api/tts/route.ts，接收文字和音色参数，调用 ElevenLabs API 生成音频，返回音频 URL"
+  },
+  {
+    "id": "task_002",
+    "name": "修改 QuestionItem 组件（添加 TTS UI）",
+    "status": true,
+    "description": "在 QuestionItem 组件中添加模式切换图标、TTS 输入框、音色选择，整合音频播放功能"
+  },
+  {
+    "id": "task_003",
+    "name": "测试验证",
+    "status": false,
+    "description": "运行开发服务器测试 TTS 生成、播放和模式切换"
+  }
+]

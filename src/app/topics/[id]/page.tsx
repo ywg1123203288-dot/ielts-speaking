@@ -24,7 +24,8 @@ import {
   X,
   Save,
   ChevronRight,
-  StickyNote
+  StickyNote,
+  Mic
 } from 'lucide-react';
 import { TopicWithCards, CardWithQuestions, Question, TimestampedSentence } from '@/lib/types';
 import {
@@ -795,6 +796,13 @@ function QuestionItem({
   const [note, setNote] = useState(question.note || '');
   const [showNote, setShowNote] = useState(false);
   const [isSavingNote, setIsSavingNote] = useState(false);
+
+  // TTS 相关状态
+  const [mode, setMode] = useState<'tts' | 'stt'>('stt');
+  const [ttsInput, setTtsInput] = useState('');
+  const [selectedVoice, setSelectedVoice] = useState<'en_uk_male' | 'en_uk_female' | 'en_us_male' | 'en_us_female'>('en_uk_male');
+  const [isGeneratingTTS, setIsGeneratingTTS] = useState(false);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
@@ -939,6 +947,43 @@ function QuestionItem({
       setError('转写失败，请查看控制台');
     } finally {
       setIsTranscribing(false);
+    }
+  };
+
+  // 生成 TTS 音频
+  const handleGenerateTTS = async () => {
+    if (!ttsInput.trim()) {
+      setError('请输入要转换的文字');
+      return;
+    }
+
+    setIsGeneratingTTS(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: ttsInput,
+          voice: selectedVoice
+        })
+      });
+
+      const result = await response.json();
+      if (result.success && result.data?.audioUrl) {
+        setAudioUrl(result.data.audioUrl);
+        setSaved(false);
+        // 重置播放状态
+        setIsPlaying(false);
+        setCurrentSentenceIndex(-1);
+      } else {
+        setError(result.error || '生成失败');
+      }
+    } catch (error) {
+      console.error('TTS 生成失败:', error);
+      setError('生成失败，请查看控制台');
+    } finally {
+      setIsGeneratingTTS(false);
     }
   };
 
@@ -1409,8 +1454,144 @@ function QuestionItem({
                 {error}
               </div>
             )}
-            
-            {/* 音频上传/播放区域 */}
+
+            {/* 模式切换图标 */}
+            <div className="flex items-center gap-2 mb-2">
+              <div className="relative group">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => { setMode('stt'); setTtsInput(''); }}
+                  className={`rounded-lg ${mode === 'stt' ? 'bg-primary/10 text-primary' : 'text-muted-foreground'}`}
+                >
+                  <Mic className="h-5 w-5" />
+                </Button>
+                <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-foreground text-background text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                  语音转文字
+                </span>
+              </div>
+              <div className="relative group">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setMode('tts')}
+                  className={`rounded-lg ${mode === 'tts' ? 'bg-primary/10 text-primary' : 'text-muted-foreground'}`}
+                >
+                  <FileText className="h-5 w-5" />
+                </Button>
+                <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-foreground text-background text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                  文字转语音
+                </span>
+              </div>
+            </div>
+
+            {/* TTS 模式输入区域 */}
+            {mode === 'tts' && (
+              <div className="space-y-3">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={ttsInput}
+                    onChange={(e) => { setTtsInput(e.target.value); setMode('tts'); }}
+                    placeholder="输入或上传"
+                    className="w-full rounded-xl border border-input bg-background px-4 py-3 pr-20 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                    {selectedVoice === 'en_uk_male' ? '英音男' :
+                     selectedVoice === 'en_uk_female' ? '英音女' :
+                     selectedVoice === 'en_us_male' ? '美音男' : '美音女'}
+                  </span>
+                </div>
+                {/* 音色选择 */}
+                <div className="flex gap-4 text-sm">
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`voice-${questionId}`}
+                      checked={selectedVoice === 'en_uk_male'}
+                      onChange={() => setSelectedVoice('en_uk_male')}
+                      className="accent-primary"
+                    />
+                    英音男
+                  </label>
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`voice-${questionId}`}
+                      checked={selectedVoice === 'en_uk_female'}
+                      onChange={() => setSelectedVoice('en_uk_female')}
+                      className="accent-primary"
+                    />
+                    英音女
+                  </label>
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`voice-${questionId}`}
+                      checked={selectedVoice === 'en_us_male'}
+                      onChange={() => setSelectedVoice('en_us_male')}
+                      className="accent-primary"
+                    />
+                    美音男
+                  </label>
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`voice-${questionId}`}
+                      checked={selectedVoice === 'en_us_female'}
+                      onChange={() => setSelectedVoice('en_us_female')}
+                      className="accent-primary"
+                    />
+                    美音女
+                  </label>
+                </div>
+                <Button
+                  onClick={handleGenerateTTS}
+                  disabled={isGeneratingTTS || !ttsInput.trim()}
+                  className="rounded-xl"
+                >
+                  {isGeneratingTTS ? '生成中...' : '🎵 生成语音'}
+                </Button>
+              </div>
+            )}
+
+            {/* STT 模式上传区域 */}
+            {mode === 'stt' && !audioUrl && (
+              <div
+                className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
+                onClick={() => document.getElementById(`audio-upload-${questionId}`)?.click()}
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const file = e.dataTransfer.files[0];
+                  if (file && file.type.startsWith('audio/')) {
+                    const dt = new DataTransfer();
+                    dt.items.add(file);
+                    const input = document.getElementById(`audio-upload-${questionId}`) as HTMLInputElement;
+                    if (input) {
+                      input.files = dt.files;
+                      input.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                  }
+                }}
+              >
+                <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">点击上传音频文件</p>
+                <input
+                  id={`audio-upload-${questionId}`}
+                  type="file"
+                  accept="audio/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    handleFileChange(e);
+                    setMode('stt');
+                  }}
+                />
+              </div>
+            )}
+
+            {/* 音频上传或播放 */}
             {!audioUrl ? (
               <div
                 className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
