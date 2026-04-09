@@ -1591,23 +1591,8 @@ function QuestionItem({
               </div>
             )}
 
-            {/* 音频上传或播放 - STT 模式且无音频时显示 */}
-            {mode === 'stt' && !audioUrl ? (
-              <div
-                className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
-                onClick={() => document.getElementById(`audio-upload-${questionId}`)?.click()}
-              >
-                <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">点击上传音频文件</p>
-                <input
-                  id={`audio-upload-${questionId}`}
-                  type="file"
-                  accept="audio/*"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-              </div>
-            ) : (
+            {/* 音频播放 */}
+            {audioUrl && (
               <div className="space-y-3">
                 {/* 音频播放器 */}
                 <div className="flex items-center gap-2 bg-background rounded-lg p-2">
