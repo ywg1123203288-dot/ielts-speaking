@@ -23,12 +23,12 @@ async function uploadToR2(fileBuffer: Buffer, key: string, contentType: string):
   return `https://${process.env.CF_PUBLIC_BUCKET_DOMAIN}/${key}`;
 }
 
-// 音色映射 - voice_id 需要从 ElevenLabs 仪表盘获取
+// 音色映射
 const VOICE_MAP: Record<string, string> = {
-  'en_uk_male': 'PLACEHOLDER_EN_UK_MALE',   // 英音男
-  'en_uk_female': 'PLACEHOLDER_EN_UK_FEMALE', // 英音女
-  'en_us_male': 'PLACEHOLDER_EN_US_MALE',    // 美音男
-  'en_us_female': 'PLACEHOLDER_EN_US_FEMALE', // 美音女
+  'en_uk_male': 'wyWA56cQNU2KqUW4eCsI',   // 英音男
+  'en_uk_female': '19STyYD15bswVz51nqLf', // 英音女
+  'en_us_male': 'dtSEYcGNJqjrtBArPCVZ',    // 美音男
+  'en_us_female': 'OYTbf65OHHFELVut7v2H', // 美音女
 };
 
 export async function POST(request: NextRequest) {
