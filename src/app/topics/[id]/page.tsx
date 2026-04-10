@@ -46,6 +46,46 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
+type TTSSegment = {
+  id: number;
+  text: string;
+  start: number;
+  end: number;
+};
+
+function buildTTSSegments(text: string): TTSSegment[] {
+  const normalizedText = text.trim();
+  if (!normalizedText) return [];
+
+  const parts = normalizedText
+    .split(/(?<=[.!?])\s+/)
+    .map(segment => segment.trim())
+    .filter(Boolean);
+
+  if (parts.length === 0) return [];
+
+  const totalChars = parts.reduce((sum, segment) => sum + segment.length, 0);
+  const estimatedTotalDuration = Math.max(totalChars * 0.08, parts.length * 1.2);
+
+  let currentStart = 0;
+
+  return parts.map((segment, index) => {
+    const duration = totalChars > 0
+      ? (segment.length / totalChars) * estimatedTotalDuration
+      : estimatedTotalDuration / parts.length;
+    const start = Number(currentStart.toFixed(1));
+    const end = Number((currentStart + duration).toFixed(1));
+    currentStart += duration;
+
+    return {
+      id: index + 1,
+      text: segment,
+      start,
+      end
+    };
+  });
+}
+
 export default function TopicPage() {
   const params = useParams();
   const router = useRouter();
@@ -800,6 +840,9 @@ function QuestionItem({
   // TTS 相关状态
   const [mode, setMode] = useState<'tts' | 'stt'>('stt');
   const [ttsInput, setTtsInput] = useState('');
+  const [ttsSegments, setTtsSegments] = useState<TTSSegment[]>([]);
+  const [editingTTSSegmentId, setEditingTTSSegmentId] = useState<number | null>(null);
+  const [editingTTSSegmentText, setEditingTTSSegmentText] = useState('');
   const [selectedVoice, setSelectedVoice] = useState<'en_uk_male' | 'en_uk_female'>('en_uk_male');
   const [isGeneratingTTS, setIsGeneratingTTS] = useState(false);
 
@@ -950,41 +993,42 @@ function QuestionItem({
     }
   };
 
-  // 生成 TTS 音频
+  useEffect(() => {
+    setTtsSegments(buildTTSSegments(ttsInput));
+    if (!ttsInput.trim()) {
+      setEditingTTSSegmentId(null);
+      setEditingTTSSegmentText('');
+    }
+  }, [ttsInput]);
+
+  const handleSelectTTSSegment = (segment: TTSSegment) => {
+    setEditingTTSSegmentId(segment.id);
+    setEditingTTSSegmentText(segment.text);
+  };
+
+  const handleSaveTTSSegment = () => {
+    if (editingTTSSegmentId === null) return;
+
+    const nextSegments = ttsSegments.map(segment =>
+      segment.id === editingTTSSegmentId
+        ? { ...segment, text: editingTTSSegmentText.trim() || segment.text }
+        : segment
+    );
+
+    setTtsInput(nextSegments.map(segment => segment.text).join(' '));
+    setEditingTTSSegmentId(null);
+    setEditingTTSSegmentText('');
+  };
+
+  // 生成 TTS 音频（占位）
   const handleGenerateTTS = async () => {
     if (!ttsInput.trim()) {
       setError('请输入要转换的文字');
       return;
     }
 
-    setIsGeneratingTTS(true);
     setError(null);
-    try {
-      const response = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: ttsInput,
-          voice: selectedVoice
-        })
-      });
-
-      const result = await response.json();
-      if (result.success && result.data?.audioUrl) {
-        setAudioUrl(result.data.audioUrl);
-        setSaved(false);
-        // 重置播放状态
-        setIsPlaying(false);
-        setCurrentSentenceIndex(-1);
-      } else {
-        setError(result.error || '生成失败');
-      }
-    } catch (error) {
-      console.error('TTS 生成失败:', error);
-      setError('生成失败，请查看控制台');
-    } finally {
-      setIsGeneratingTTS(false);
-    }
+    window.alert('功能开发中');
   };
 
   const handleTranslate = async () => {
@@ -1489,14 +1533,14 @@ function QuestionItem({
             {mode === 'tts' && (
               <div className="space-y-3">
                 <div className="relative">
-                  <input
-                    type="text"
+                  <textarea
                     value={ttsInput}
                     onChange={(e) => { setTtsInput(e.target.value); setMode('tts'); }}
-                    placeholder="输入或上传"
-                    className="w-full rounded-xl border border-input bg-background px-4 py-3 pr-20 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="输入英文文字，系统会按 . ! ? 实时切分句子预览"
+                    rows={5}
+                    className="w-full rounded-xl border border-input bg-background px-4 py-3 pr-20 text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-y"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                  <span className="absolute right-3 top-3 text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                     {selectedVoice === 'en_uk_male' ? '男' : '女'}
                   </span>
                 </div>
@@ -1523,12 +1567,91 @@ function QuestionItem({
                     女
                   </label>
                 </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium text-muted-foreground">句子预览</h4>
+                    {ttsSegments.length > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        共 {ttsSegments.length} 句
+                      </span>
+                    )}
+                  </div>
+                  {ttsSegments.length > 0 ? (
+                    <div className="space-y-2">
+                      {ttsSegments.map((segment) => {
+                        const isEditingSegment = editingTTSSegmentId === segment.id;
+
+                        return (
+                          <div
+                            key={segment.id}
+                            className={`rounded-xl border px-3 py-3 transition-colors ${
+                              isEditingSegment
+                                ? 'border-primary bg-primary/5'
+                                : 'border-border bg-background hover:border-primary/40 hover:bg-muted/50'
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleSelectTTSSegment(segment)}
+                              className="w-full text-left"
+                            >
+                              <div className="mb-1 flex items-center justify-between gap-3">
+                                <span className="text-xs font-mono text-muted-foreground">
+                                  {`{ id: ${segment.id}, start: ${segment.start.toFixed(1)}, end: ${segment.end.toFixed(1)} }`}
+                                </span>
+                                <span className="text-[11px] text-primary">点击编辑</span>
+                              </div>
+                              <p className="text-sm text-foreground">{segment.text}</p>
+                            </button>
+
+                            {isEditingSegment && (
+                              <div className="mt-3 space-y-2">
+                                <textarea
+                                  value={editingTTSSegmentText}
+                                  onChange={(e) => setEditingTTSSegmentText(e.target.value)}
+                                  rows={3}
+                                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-y"
+                                />
+                                <div className="flex gap-2">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={handleSaveTTSSegment}
+                                    className="rounded-lg"
+                                  >
+                                    保存句子
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditingTTSSegmentId(null);
+                                      setEditingTTSSegmentText('');
+                                    }}
+                                    className="rounded-lg"
+                                  >
+                                    取消
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
+                      输入内容后，这里会实时显示切分后的句子预览。
+                    </div>
+                  )}
+                </div>
                 <Button
                   onClick={handleGenerateTTS}
-                  disabled={isGeneratingTTS || !ttsInput.trim()}
+                  disabled={!ttsInput.trim()}
                   className="rounded-xl"
                 >
-                  {isGeneratingTTS ? '生成中...' : '🎵 生成语音'}
+                  生成语音
                 </Button>
               </div>
             )}
