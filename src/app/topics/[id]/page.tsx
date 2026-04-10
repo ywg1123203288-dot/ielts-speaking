@@ -843,6 +843,8 @@ function QuestionItem({
   const [ttsSegments, setTtsSegments] = useState<TTSSegment[]>([]);
   const [editingTTSSegmentId, setEditingTTSSegmentId] = useState<number | null>(null);
   const [editingTTSSegmentText, setEditingTTSSegmentText] = useState('');
+  const [editingTTSSegmentStart, setEditingTTSSegmentStart] = useState('');
+  const [editingTTSSegmentEnd, setEditingTTSSegmentEnd] = useState('');
   const [selectedVoice, setSelectedVoice] = useState<'en_uk_male' | 'en_uk_female'>('en_uk_male');
   const [isGeneratingTTS, setIsGeneratingTTS] = useState(false);
 
@@ -1004,6 +1006,20 @@ function QuestionItem({
   const handleSelectTTSSegment = (segment: TTSSegment) => {
     setEditingTTSSegmentId(segment.id);
     setEditingTTSSegmentText(segment.text);
+    setEditingTTSSegmentStart(segment.start.toFixed(1));
+    setEditingTTSSegmentEnd(segment.end.toFixed(1));
+  };
+
+  const adjustTTSSegmentStart = (delta: number) => {
+    const current = parseFloat(editingTTSSegmentStart) || 0;
+    const newValue = Math.max(0, current + delta);
+    setEditingTTSSegmentStart(newValue.toFixed(1));
+  };
+
+  const adjustTTSSegmentEnd = (delta: number) => {
+    const current = parseFloat(editingTTSSegmentEnd) || 0;
+    const newValue = Math.max(0, current + delta);
+    setEditingTTSSegmentEnd(newValue.toFixed(1));
   };
 
   const handleSaveTTSSegment = () => {
@@ -1011,13 +1027,21 @@ function QuestionItem({
 
     const nextSegments = ttsSegments.map(segment =>
       segment.id === editingTTSSegmentId
-        ? { ...segment, text: editingTTSSegmentText.trim() || segment.text }
+        ? {
+            ...segment,
+            text: editingTTSSegmentText.trim() || segment.text,
+            start: parseFloat(editingTTSSegmentStart) || segment.start,
+            end: parseFloat(editingTTSSegmentEnd) || segment.end
+          }
         : segment
     );
 
+    setTtsSegments(nextSegments);
     setTtsInput(nextSegments.map(segment => segment.text).join(' '));
     setEditingTTSSegmentId(null);
     setEditingTTSSegmentText('');
+    setEditingTTSSegmentStart('');
+    setEditingTTSSegmentEnd('');
   };
 
   // 生成 TTS 音频
@@ -1688,19 +1712,56 @@ function QuestionItem({
                                 : 'border-border bg-background hover:border-primary/40 hover:bg-muted/50'
                             }`}
                           >
-                            <button
-                              type="button"
-                              onClick={() => handleSelectTTSSegment(segment)}
-                              className="w-full text-left"
-                            >
-                              <div className="mb-1 flex items-center justify-between gap-3">
-                                <span className="text-xs font-mono text-muted-foreground">
-                                  {`{ id: ${segment.id}, start: ${segment.start.toFixed(1)}, end: ${segment.end.toFixed(1)} }`}
-                                </span>
-                                <span className="text-[11px] text-primary">点击编辑</span>
-                              </div>
-                              <p className="text-sm text-foreground">{segment.text}</p>
-                            </button>
+                            <div className="mb-1 flex items-center justify-between gap-3">
+                              {/* 时间戳 - 可点击调整 */}
+                              <button
+                                type="button"
+                                onClick={() => handleSelectTTSSegment(segment)}
+                                className="text-xs font-mono text-muted-foreground hover:text-primary transition-colors"
+                              >
+                                {isEditingSegment ? (
+                                  <div className="flex items-center gap-1">
+                                    {/* 开始时间调整 */}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); adjustTTSSegmentStart(-0.1); }}
+                                      className="px-1.5 py-0.5 rounded border border-border bg-background hover:bg-muted text-muted-foreground"
+                                    >
+                                      -
+                                    </button>
+                                    <span className="min-w-10 text-center">{editingTTSSegmentStart}s</span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); adjustTTSSegmentStart(0.1); }}
+                                      className="px-1.5 py-0.5 rounded border border-border bg-background hover:bg-muted text-muted-foreground"
+                                    >
+                                      +
+                                    </button>
+                                    <span className="mx-1">-</span>
+                                    {/* 结束时间调整 */}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); adjustTTSSegmentEnd(-0.1); }}
+                                      className="px-1.5 py-0.5 rounded border border-border bg-background hover:bg-muted text-muted-foreground"
+                                    >
+                                      -
+                                    </button>
+                                    <span className="min-w-10 text-center">{editingTTSSegmentEnd}s</span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); adjustTTSSegmentEnd(0.1); }}
+                                      className="px-1.5 py-0.5 rounded border border-border bg-background hover:bg-muted text-muted-foreground"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="text-primary">点击调整时间</span>
+                                )}
+                              </button>
+                              <span className="text-[11px] text-muted-foreground">句子 {segment.id}</span>
+                            </div>
+                            <p className="text-sm text-foreground">{segment.text}</p>
 
                             {isEditingSegment && (
                               <div className="mt-3 space-y-2">
@@ -1709,6 +1770,7 @@ function QuestionItem({
                                   onChange={(e) => setEditingTTSSegmentText(e.target.value)}
                                   rows={3}
                                   className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-y"
+                                  placeholder="编辑句子文本..."
                                 />
                                 <div className="flex gap-2">
                                   <Button
@@ -1717,7 +1779,7 @@ function QuestionItem({
                                     onClick={handleSaveTTSSegment}
                                     className="rounded-lg"
                                   >
-                                    保存句子
+                                    保存
                                   </Button>
                                   <Button
                                     type="button"
@@ -1726,6 +1788,8 @@ function QuestionItem({
                                     onClick={() => {
                                       setEditingTTSSegmentId(null);
                                       setEditingTTSSegmentText('');
+                                      setEditingTTSSegmentStart('');
+                                      setEditingTTSSegmentEnd('');
                                     }}
                                     className="rounded-lg"
                                   >
