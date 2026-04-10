@@ -800,7 +800,7 @@ function QuestionItem({
   // TTS 相关状态
   const [mode, setMode] = useState<'tts' | 'stt'>('stt');
   const [ttsInput, setTtsInput] = useState('');
-  const [selectedVoice, setSelectedVoice] = useState<'en_uk_male' | 'en_uk_female' | 'en_us_male' | 'en_us_female'>('en_uk_male');
+  const [selectedVoice, setSelectedVoice] = useState<'en_uk_male' | 'en_uk_female'>('en_uk_male');
   const [isGeneratingTTS, setIsGeneratingTTS] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -1497,9 +1497,7 @@ function QuestionItem({
                     className="w-full rounded-xl border border-input bg-background px-4 py-3 pr-20 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-                    {selectedVoice === 'en_uk_male' ? '英音男' :
-                     selectedVoice === 'en_uk_female' ? '英音女' :
-                     selectedVoice === 'en_us_male' ? '美音男' : '美音女'}
+                    {selectedVoice === 'en_uk_male' ? '男' : '女'}
                   </span>
                 </div>
                 {/* 音色选择 */}
@@ -1512,7 +1510,7 @@ function QuestionItem({
                       onChange={() => setSelectedVoice('en_uk_male')}
                       className="accent-primary"
                     />
-                    英音男
+                    男
                   </label>
                   <label className="flex items-center gap-1 cursor-pointer">
                     <input
@@ -1522,27 +1520,7 @@ function QuestionItem({
                       onChange={() => setSelectedVoice('en_uk_female')}
                       className="accent-primary"
                     />
-                    英音女
-                  </label>
-                  <label className="flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="radio"
-                      name={`voice-${questionId}`}
-                      checked={selectedVoice === 'en_us_male'}
-                      onChange={() => setSelectedVoice('en_us_male')}
-                      className="accent-primary"
-                    />
-                    美音男
-                  </label>
-                  <label className="flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="radio"
-                      name={`voice-${questionId}`}
-                      checked={selectedVoice === 'en_us_female'}
-                      onChange={() => setSelectedVoice('en_us_female')}
-                      className="accent-primary"
-                    />
-                    美音女
+                    女
                   </label>
                 </div>
                 <Button

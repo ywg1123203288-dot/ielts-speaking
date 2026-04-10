@@ -27,8 +27,6 @@ async function uploadToR2(fileBuffer: Buffer, key: string, contentType: string):
 const VOICE_MAP: Record<string, string> = {
   en_uk_male: 'ErXwobaYiN019PkySvjV',
   en_uk_female: '21m00Tcm4TlvDq8ikWAM',
-  en_us_male: 'pNInz6obpgDQGcFmaJgB',
-  en_us_female: 'EXAVITQu4vr4xnSDxMaL',
 };
 
 export async function POST(request: NextRequest) {
