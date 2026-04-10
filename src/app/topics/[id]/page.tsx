@@ -1307,22 +1307,53 @@ function QuestionItem({
     if (question.sentences && question.sentences[index]) {
       const s = question.sentences[index];
       setEditingSentenceIndex(index);
-      setEditStartTime(s.start.toFixed(2));
-      setEditEndTime(s.end.toFixed(2));
+      setEditStartTime(s.start.toFixed(1));
+      setEditEndTime(s.end.toFixed(1));
     }
+  };
+
+  const adjustSentenceSplitPoint = (delta: number) => {
+    if (editingSentenceIndex === null || !question.sentences) return;
+
+    const currentSentence = question.sentences[editingSentenceIndex];
+    if (!currentSentence) return;
+
+    const nextSentence = question.sentences[editingSentenceIndex + 1];
+    const nextBoundary = nextSentence?.end ?? Infinity;
+    const nextValue = (parseFloat(editEndTime) || currentSentence.end) + delta;
+    const clampedValue = Math.min(Math.max(nextValue, currentSentence.start), nextBoundary);
+
+    setEditEndTime(clampedValue.toFixed(1));
   };
 
   // 保存句子时间戳
   const saveSentenceTimestamp = async () => {
     if (editingSentenceIndex === null || !question.sentences) return;
-    
+
+    const currentSentence = question.sentences[editingSentenceIndex];
+    if (!currentSentence) return;
+
+    const parsedSplitPoint = parseFloat(editEndTime);
+    const nextSentence = question.sentences[editingSentenceIndex + 1];
+    const nextBoundary = nextSentence?.end ?? Infinity;
+    const splitPoint = Number.isFinite(parsedSplitPoint)
+      ? Math.min(Math.max(parsedSplitPoint, currentSentence.start), nextBoundary)
+      : currentSentence.end;
+
     const newSentences = [...question.sentences];
     newSentences[editingSentenceIndex] = {
       ...newSentences[editingSentenceIndex],
-      start: parseFloat(editStartTime) || 0,
-      end: parseFloat(editEndTime) || 0
+      start: currentSentence.start,
+      end: splitPoint
     };
-    
+
+    if (nextSentence) {
+      newSentences[editingSentenceIndex + 1] = {
+        ...nextSentence,
+        start: splitPoint
+      };
+    }
+
     try {
       const response = await fetch(`/api/questions/${questionId}`, {
         method: 'PUT',
@@ -1333,6 +1364,8 @@ function QuestionItem({
       if (result.success && result.data) {
         onQuestionUpdate?.(result.data);
         setEditingSentenceIndex(null);
+        setEditStartTime('');
+        setEditEndTime('');
       } else {
         setError('保存失败');
       }
@@ -1902,52 +1935,31 @@ function QuestionItem({
                                 editingSentenceIndex === sentenceIndex ? (
                                   <div className="flex items-center gap-1 shrink-0 text-xs">
                                     <button
-                                      onClick={(e) => { e.stopPropagation(); setEditStartTime((parseFloat(editStartTime) - 0.1).toFixed(1)); }}
-                                      className="px-1 py-0.5 rounded bg-muted hover:bg-destructive/20 text-muted-foreground"
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); adjustSentenceSplitPoint(-0.1); }}
+                                      className="px-2 py-0.5 rounded border border-border bg-background hover:bg-muted text-muted-foreground"
                                       title="减少0.1秒"
                                     >
                                       -
                                     </button>
-                                    <input
-                                      type="number"
-                                      step="0.1"
-                                      value={editStartTime}
-                                      onChange={(e) => setEditStartTime(e.target.value)}
-                                      className="w-12 px-1 py-0.5 rounded border bg-background text-center"
-                                      onClick={(e) => e.stopPropagation()}
-                                    />
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); setEditStartTime((parseFloat(editStartTime) + 0.1).toFixed(1)); }}
-                                      className="px-1 py-0.5 rounded bg-muted hover:bg-green-100 text-muted-foreground"
-                                      title="增加0.1秒"
-                                    >
-                                      +
-                                    </button>
-                                    <span className="mx-1">-</span>
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); setEditEndTime((parseFloat(editEndTime) - 0.1).toFixed(1)); }}
-                                      className="px-1 py-0.5 rounded bg-muted hover:bg-destructive/20 text-muted-foreground"
-                                      title="减少0.1秒"
-                                    >
-                                      -
-                                    </button>
-                                    <input
-                                      type="number"
-                                      step="0.1"
-                                      value={editEndTime}
-                                      onChange={(e) => setEditEndTime(e.target.value)}
-                                      className="w-12 px-1 py-0.5 rounded border bg-background text-center"
-                                      onClick={(e) => e.stopPropagation()}
-                                    />
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); setEditEndTime((parseFloat(editEndTime) + 0.1).toFixed(1)); }}
-                                      className="px-1 py-0.5 rounded bg-muted hover:bg-green-100 text-muted-foreground"
-                                      title="增加0.1秒"
-                                    >
-                                      +
-                                    </button>
+                                    <span className="min-w-12 rounded border border-border bg-background px-2 py-0.5 text-center font-mono">
+                                      {editStartTime}
+                                    </span>
+                                    <span>-</span>
+                                    <span className="min-w-12 rounded border border-border bg-background px-2 py-0.5 text-center font-mono">
+                                      {editEndTime}
+                                    </span>
                                     <span>s</span>
                                     <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); adjustSentenceSplitPoint(0.1); }}
+                                      className="px-2 py-0.5 rounded border border-border bg-background hover:bg-muted text-muted-foreground"
+                                      title="增加0.1秒"
+                                    >
+                                      +
+                                    </button>
+                                    <button
+                                      type="button"
                                       onClick={(e) => { e.stopPropagation(); saveSentenceTimestamp(); }}
                                       className="ml-1 p-1 rounded text-green-600 hover:bg-green-50"
                                       title="保存"
@@ -1955,7 +1967,13 @@ function QuestionItem({
                                       <Check className="h-3 w-3" />
                                     </button>
                                     <button
-                                      onClick={(e) => { e.stopPropagation(); setEditingSentenceIndex(null); }}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingSentenceIndex(null);
+                                        setEditStartTime('');
+                                        setEditEndTime('');
+                                      }}
                                       className="p-1 rounded text-muted-foreground hover:bg-muted"
                                       title="取消"
                                     >
