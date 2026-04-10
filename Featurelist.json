@@ -1,20 +1,32 @@
 [
   {
     "id": "task_001",
-    "name": "创建 TTS API 路由（调用 ElevenLabs）",
-    "status": true,
-    "description": "创建 /api/tts/route.ts，接收文字和音色参数，调用 ElevenLabs API 生成音频，返回音频 URL"
+    "name": "TTS 模式重构：文字输入 + 实时句子预览",
+    "status": false,
+    "description": "TTS 输入区：textarea 输入文字，实时按标点切分显示句子预览，可微调切分点"
   },
   {
     "id": "task_002",
-    "name": "修改 QuestionItem 组件（添加 TTS UI）",
-    "status": true,
-    "description": "在 QuestionItem 组件中添加模式切换图标、TTS 输入框、音色选择，整合音频播放功能"
+    "name": "TTS 生成音频 + ASR 获取时间戳",
+    "status": false,
+    "description": "点生成后调用 ElevenLabs，音频生成后调用 ASR（Deepgram）获取精确时间戳"
   },
   {
     "id": "task_003",
+    "name": "统一结果视图",
+    "status": false,
+    "description": "重构 QuestionItem：移除 TTS/STT tab 设计，改为输入区 → 结果视图的两阶段结构"
+  },
+  {
+    "id": "task_004",
+    "name": "句子微调切分点功能",
+    "status": false,
+    "description": "点击句子时间戳进入微调模式，可拖拽或 +/- 按钮调整起止时间"
+  },
+  {
+    "id": "task_005",
     "name": "测试验证",
     "status": false,
-    "description": "运行开发服务器测试 TTS 生成、播放和模式切换"
+    "description": "TTS 全流程测试：输入文字 → 生成音频 → 显示结果 → 微调切分"
   }
 ]
