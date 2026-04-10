@@ -833,6 +833,7 @@ function QuestionItem({
   const [editingSentenceIndex, setEditingSentenceIndex] = useState<number | null>(null);
   const [editStartTime, setEditStartTime] = useState('');
   const [editEndTime, setEditEndTime] = useState('');
+  const [editSentenceText, setEditSentenceText] = useState('');
   const [note, setNote] = useState(question.note || '');
   const [showNote, setShowNote] = useState(false);
   const [isSavingNote, setIsSavingNote] = useState(false);
@@ -1326,13 +1327,14 @@ function QuestionItem({
     }
   };
 
-  // 开始编辑句子时间戳
+  // 开始编辑句子
   const startEditSentence = (index: number) => {
     if (question.sentences && question.sentences[index]) {
       const s = question.sentences[index];
       setEditingSentenceIndex(index);
       setEditStartTime(s.start.toFixed(1));
       setEditEndTime(s.end.toFixed(1));
+      setEditSentenceText(s.text);
     }
   };
 
@@ -1368,7 +1370,8 @@ function QuestionItem({
     newSentences[editingSentenceIndex] = {
       ...newSentences[editingSentenceIndex],
       start: currentSentence.start,
-      end: splitPoint
+      end: splitPoint,
+      text: editSentenceText || currentSentence.text
     };
 
     if (nextSentence) {
@@ -1390,6 +1393,7 @@ function QuestionItem({
         setEditingSentenceIndex(null);
         setEditStartTime('');
         setEditEndTime('');
+        setEditSentenceText('');
       } else {
         setError('保存失败');
       }
@@ -1397,6 +1401,77 @@ function QuestionItem({
       console.error('保存时间戳失败:', err);
       setError('保存失败');
     }
+  };
+
+  // 拆分句子为两个
+  const splitSentence = () => {
+    if (editingSentenceIndex === null || !question.sentences) return;
+
+    const currentSentence = question.sentences[editingSentenceIndex];
+    if (!currentSentence) return;
+
+    // 在文本中使用 || 作为拆分标记
+    const parts = editSentenceText.split('||');
+    if (parts.length < 2) {
+      // 如果没有 || 标记，提示用户
+      setError('请在要拆分的位置输入 || 标记');
+      return;
+    }
+
+    const firstPart = parts[0].trim();
+    const secondPart = parts.slice(1).join('||').trim(); // 防止多次split
+
+    if (!firstPart || !secondPart) {
+      setError('拆分后的两部分都不能为空');
+      return;
+    }
+
+    // 计算时间分配（按文本长度比例）
+    const totalLen = editSentenceText.length;
+    const firstLen = firstPart.length;
+    const secondLen = secondPart.length;
+    const duration = currentSentence.end - currentSentence.start;
+    const firstDuration = (firstLen / totalLen) * duration;
+    const secondDuration = duration - firstDuration;
+
+    const firstEnd = currentSentence.start + firstDuration;
+    const secondStart = firstEnd;
+
+    const newSentences = [...question.sentences];
+    newSentences[editingSentenceIndex] = {
+      ...currentSentence,
+      text: firstPart,
+      end: Number(firstEnd.toFixed(2))
+    };
+
+    // 在当前位置后插入新的句子
+    const newSentence = {
+      text: secondPart,
+      start: Number(secondStart.toFixed(2)),
+      end: currentSentence.end
+    };
+
+    newSentences.splice(editingSentenceIndex + 1, 0, newSentence);
+
+    // 保存到数据库
+    fetch(`/api/questions/${questionId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sentences: newSentences })
+    }).then(res => res.json()).then(result => {
+      if (result.success && result.data) {
+        onQuestionUpdate?.(result.data);
+        setEditingSentenceIndex(null);
+        setEditStartTime('');
+        setEditEndTime('');
+        setEditSentenceText('');
+      } else {
+        setError('拆分失败');
+      }
+    }).catch(err => {
+      console.error('拆分句子失败:', err);
+      setError('拆分失败');
+    });
   };
 
   // 保存笔记
@@ -1979,7 +2054,7 @@ function QuestionItem({
                 {question.english_transcript && (
                   <div className="mt-3">
                     <h4 className="text-sm font-medium text-muted-foreground mb-2">
-                      {showNote ? '英文原文（点击句子跳转播放）' : '英文原文（点击句子跳转播放，点击时间可微调）'}
+                      {showNote ? '英文原文（点击句子跳转播放）' : '英文原文（点击句子跳转播放，点击可编辑文本或调整时间，用 || 拆分句子）'}
                     </h4>
                     <div className={`flex gap-3 ${showNote ? '' : ''}`}>
                       {/* 左侧：英文转录句子 */}
@@ -1988,7 +2063,7 @@ function QuestionItem({
                           question.sentences.map((sentence, sentenceIndex) => (
                             <div
                               key={sentenceIndex}
-                              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+                              className={`flex flex-col gap-2 px-3 py-2 rounded-lg transition-all ${
                                 currentSentenceIndex === sentenceIndex
                                   ? 'bg-gradient-to-r from-macaron-pink/20 via-macaron-mint/20 to-macaron-lavender/20 border-l-4 border-macaron-pink shadow-sm'
                                   : 'hover:bg-muted'
@@ -1997,70 +2072,101 @@ function QuestionItem({
                               {/* 时间戳 - 可编辑（笔记关闭时显示） */}
                               {!showNote && (
                                 editingSentenceIndex === sentenceIndex ? (
-                                  <div className="flex items-center gap-1 shrink-0 text-xs">
+                                  <div className="space-y-2">
+                                    {/* 时间调整行 */}
+                                    <div className="flex items-center gap-1 text-xs">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); adjustSentenceSplitPoint(-0.1); }}
+                                        className="px-2 py-0.5 rounded border border-border bg-background hover:bg-muted text-muted-foreground"
+                                        title="减少0.1秒"
+                                      >
+                                        -
+                                      </button>
+                                      <span className="min-w-12 rounded border border-border bg-background px-2 py-0.5 text-center font-mono">
+                                        {editStartTime}
+                                      </span>
+                                      <span>-</span>
+                                      <span className="min-w-12 rounded border border-border bg-background px-2 py-0.5 text-center font-mono">
+                                        {editEndTime}
+                                      </span>
+                                      <span>s</span>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); adjustSentenceSplitPoint(0.1); }}
+                                        className="px-2 py-0.5 rounded border border-border bg-background hover:bg-muted text-muted-foreground"
+                                        title="增加0.1秒"
+                                      >
+                                        +
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); saveSentenceTimestamp(); }}
+                                        className="ml-1 p-1 rounded text-green-600 hover:bg-green-50"
+                                        title="保存"
+                                      >
+                                        <Check className="h-3 w-3" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setEditingSentenceIndex(null);
+                                          setEditStartTime('');
+                                          setEditEndTime('');
+                                          setEditSentenceText('');
+                                        }}
+                                        className="p-1 rounded text-muted-foreground hover:bg-muted"
+                                        title="取消"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                    {/* 文本编辑 + 拆分 */}
+                                    <textarea
+                                      value={editSentenceText}
+                                      onChange={(e) => setEditSentenceText(e.target.value)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      rows={2}
+                                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-y"
+                                      placeholder="编辑句子文本... 用 || 标记拆分位置"
+                                    />
                                     <button
                                       type="button"
-                                      onClick={(e) => { e.stopPropagation(); adjustSentenceSplitPoint(-0.1); }}
-                                      className="px-2 py-0.5 rounded border border-border bg-background hover:bg-muted text-muted-foreground"
-                                      title="减少0.1秒"
+                                      onClick={(e) => { e.stopPropagation(); splitSentence(); }}
+                                      className="self-start px-3 py-1 rounded-lg border border-primary/30 text-primary text-xs hover:bg-primary/10"
                                     >
-                                      -
-                                    </button>
-                                    <span className="min-w-12 rounded border border-border bg-background px-2 py-0.5 text-center font-mono">
-                                      {editStartTime}
-                                    </span>
-                                    <span>-</span>
-                                    <span className="min-w-12 rounded border border-border bg-background px-2 py-0.5 text-center font-mono">
-                                      {editEndTime}
-                                    </span>
-                                    <span>s</span>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => { e.stopPropagation(); adjustSentenceSplitPoint(0.1); }}
-                                      className="px-2 py-0.5 rounded border border-border bg-background hover:bg-muted text-muted-foreground"
-                                      title="增加0.1秒"
-                                    >
-                                      +
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => { e.stopPropagation(); saveSentenceTimestamp(); }}
-                                      className="ml-1 p-1 rounded text-green-600 hover:bg-green-50"
-                                      title="保存"
-                                    >
-                                      <Check className="h-3 w-3" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setEditingSentenceIndex(null);
-                                        setEditStartTime('');
-                                        setEditEndTime('');
-                                      }}
-                                      className="p-1 rounded text-muted-foreground hover:bg-muted"
-                                      title="取消"
-                                    >
-                                      <X className="h-3 w-3" />
+                                      拆分为两句
                                     </button>
                                   </div>
                                 ) : (
-                                  <span
-                                    onClick={(e) => { e.stopPropagation(); startEditSentence(sentenceIndex); }}
-                                    className="text-[10px] text-muted-foreground/60 hover:text-primary cursor-pointer shrink-0 font-mono px-1"
-                                    title="点击调整时间戳"
-                                  >
-                                    {sentence.start.toFixed(1)}-{sentence.end.toFixed(1)}s
-                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      onClick={(e) => { e.stopPropagation(); startEditSentence(sentenceIndex); }}
+                                      className="text-[10px] text-muted-foreground/60 hover:text-primary cursor-pointer shrink-0 font-mono px-1"
+                                      title="点击编辑文本和调整时间"
+                                    >
+                                      {sentence.start.toFixed(1)}-{sentence.end.toFixed(1)}s
+                                    </span>
+                                    {/* 句子文本 - 点击播放 */}
+                                    <button
+                                      onClick={() => playSentence(sentence, sentenceIndex)}
+                                      className="flex-1 text-left text-foreground"
+                                    >
+                                      {sentence.text}
+                                    </button>
+                                  </div>
                                 )
                               )}
-                              {/* 句子文本 - 点击播放 */}
-                              <button
-                                onClick={() => playSentence(sentence, sentenceIndex)}
-                                className="flex-1 text-left text-foreground"
-                              >
-                                {sentence.text}
-                              </button>
+                              {/* 笔记模式：只显示句子 */}
+                              {showNote && (
+                                <button
+                                  onClick={() => playSentence(sentence, sentenceIndex)}
+                                  className="text-left text-foreground"
+                                >
+                                  {sentence.text}
+                                </button>
+                              )}
                             </div>
                           ))
                         ) : (
