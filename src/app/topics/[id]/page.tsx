@@ -1410,16 +1410,16 @@ function QuestionItem({
     const currentSentence = question.sentences[editingSentenceIndex];
     if (!currentSentence) return;
 
-    // 在文本中使用 || 作为拆分标记
-    const parts = editSentenceText.split('||');
+    // 在文本中使用 / 作为拆分标记
+    const parts = editSentenceText.split('/');
     if (parts.length < 2) {
-      // 如果没有 || 标记，提示用户
-      setError('请在要拆分的位置输入 || 标记');
+      // 如果没有 / 标记，提示用户
+      setError('请在要拆分的位置输入 / 标记');
       return;
     }
 
     const firstPart = parts[0].trim();
-    const secondPart = parts.slice(1).join('||').trim(); // 防止多次split
+    const secondPart = parts.slice(1).join('/').trim(); // 防止多次split
 
     if (!firstPart || !secondPart) {
       setError('拆分后的两部分都不能为空');
@@ -2054,7 +2054,7 @@ function QuestionItem({
                 {question.english_transcript && (
                   <div className="mt-3">
                     <h4 className="text-sm font-medium text-muted-foreground mb-2">
-                      {showNote ? '英文原文（点击句子跳转播放）' : '英文原文（点击句子跳转播放，点击可编辑文本或调整时间，用 || 拆分句子）'}
+                      {showNote ? '英文原文（点击句子跳转播放）' : '英文原文（点击句子跳转播放，点击可编辑文本或调整时间，用 / 拆分句子）'}
                     </h4>
                     <div className={`flex gap-3 ${showNote ? '' : ''}`}>
                       {/* 左侧：英文转录句子 */}
@@ -2129,7 +2129,7 @@ function QuestionItem({
                                       onClick={(e) => e.stopPropagation()}
                                       rows={2}
                                       className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-y"
-                                      placeholder="编辑句子文本... 用 || 标记拆分位置"
+                                      placeholder="编辑句子文本... 用 / 标记拆分位置"
                                     />
                                     <button
                                       type="button"
