@@ -1594,8 +1594,8 @@ function QuestionItem({
               </div>
             </div>
 
-            {/* TTS 模式输入区域 */}
-            {mode === 'tts' && (
+            {/* TTS 模式输入区域（无音频时显示） */}
+            {mode === 'tts' && !audioUrl && (
               <div className="space-y-3">
                 <div className="relative">
                   <textarea
@@ -1760,6 +1760,24 @@ function QuestionItem({
             {/* 音频播放 */}
             {audioUrl && (
               <div className="space-y-3">
+                {/* 重新生成按钮（TTS 模式） */}
+                {mode === 'tts' && (
+                  <div className="flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setAudioUrl(null);
+                        setSaved(false);
+                        setTtsInput('');
+                        setTtsSegments([]);
+                      }}
+                      className="rounded-lg text-muted-foreground"
+                    >
+                      重新生成
+                    </Button>
+                  </div>
+                )}
                 {/* 音频播放器 */}
                 <div className="flex items-center gap-2 bg-background rounded-lg p-2">
                   <Button
