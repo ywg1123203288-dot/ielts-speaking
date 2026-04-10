@@ -1020,15 +1020,80 @@ function QuestionItem({
     setEditingTTSSegmentText('');
   };
 
-  // 生成 TTS 音频（占位）
+  // 生成 TTS 音频
   const handleGenerateTTS = async () => {
     if (!ttsInput.trim()) {
       setError('请输入要转换的文字');
       return;
     }
 
+    setIsGeneratingTTS(true);
     setError(null);
-    window.alert('功能开发中');
+    try {
+      // 1. 调用 TTS API 生成音频
+      const ttsResponse = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: ttsInput,
+          voice: selectedVoice
+        })
+      });
+
+      const ttsResult = await ttsResponse.json();
+      if (!ttsResult.success || !ttsResult.data?.audioUrl) {
+        setError(ttsResult.error || 'TTS 生成失败');
+        return;
+      }
+
+      const audioUrl = ttsResult.data.audioUrl;
+
+      // 2. 保存音频 URL 到 question
+      const saveResponse = await fetch(`/api/questions/${questionId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audio_url: audioUrl })
+      });
+
+      if (!saveResponse.ok) {
+        setError('保存音频 URL 失败');
+        return;
+      }
+
+      // 3. 调用 ASR 获取精确时间戳
+      const transcribeResponse = await fetch('/api/transcribe/retry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questionId: questionId,
+          audioUrl: audioUrl
+        })
+      });
+
+      const transcribeResult = await transcribeResponse.json();
+      if (!transcribeResult.success) {
+        setError(transcribeResult.error || 'ASR 转写失败');
+        return;
+      }
+
+      // 4. 更新本地状态：音频 + 句子数据
+      setAudioUrl(audioUrl);
+      setSaved(true);
+      setIsPlaying(false);
+      setCurrentSentenceIndex(-1);
+
+      // 5. 精准更新 question 数据（包含 sentences）
+      const qRes = await fetch(`/api/questions/${questionId}`);
+      const qData = await qRes.json();
+      if (qData.success && qData.data) {
+        onQuestionUpdate?.(qData.data);
+      }
+    } catch (error) {
+      console.error('TTS 生成失败:', error);
+      setError('生成失败，请查看控制台');
+    } finally {
+      setIsGeneratingTTS(false);
+    }
   };
 
   const handleTranslate = async () => {
@@ -1648,10 +1713,10 @@ function QuestionItem({
                 </div>
                 <Button
                   onClick={handleGenerateTTS}
-                  disabled={!ttsInput.trim()}
+                  disabled={!ttsInput.trim() || isGeneratingTTS}
                   className="rounded-xl"
                 >
-                  生成语音
+                  {isGeneratingTTS ? '生成中...' : '🎵 生成语音'}
                 </Button>
               </div>
             )}
