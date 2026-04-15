@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
 import { Readable } from 'stream';
 
 // R2 配置
@@ -24,10 +25,18 @@ async function uploadToR2(fileBuffer: Buffer, key: string, contentType: string):
   return `https://${process.env.CF_PUBLIC_BUCKET_DOMAIN}/${key}`;
 }
 
-// ElevenLabs 音色映射（Custom Voice ID，免费可用）
+async function streamToBuffer(stream: Readable): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
+// Edge TTS 音色映射
 const VOICE_MAP: Record<string, string> = {
-  en_uk_male: 'ErXwobaYiN019PkySvjV',    // 男声
-  en_uk_female: 'OYTbf65OHHFELVut7v2H',  // 女声（用户自定义）
+  en_uk_male: 'en-GB-RyanNeural',
+  en_uk_female: 'en-GB-SoniaNeural',
 };
 
 export async function POST(request: NextRequest) {
@@ -38,49 +47,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: '缺少参数' }, { status: 400 });
     }
 
-    const voiceId = VOICE_MAP[voice];
-    if (!voiceId) {
+    const voiceName = VOICE_MAP[voice];
+    if (!voiceName) {
       return NextResponse.json({ success: false, error: '无效的音色' }, { status: 400 });
     }
 
-    if (!process.env.ELEVENLABS_API_KEY) {
-      return NextResponse.json(
-        { success: false, error: '服务端未读取到 ELEVENLABS_API_KEY' },
-        { status: 500 }
-      );
-    }
+    // 使用 Edge TTS 生成音频
+    const tts = new MsEdgeTTS();
+    await tts.setMetadata(voiceName, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+    const { audioStream } = tts.toStream(text);
 
-    // 调用 ElevenLabs
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-      method: 'POST',
-      headers: {
-        'xi-api-key': process.env.ELEVENLABS_API_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        text,
-        model_id: 'eleven_multilingual_v2',
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('ElevenLabs API error:', response.status, errorText);
-
-      return NextResponse.json(
-        {
-          success: false,
-          error: `ElevenLabs API error: ${response.status} - ${errorText}`,
-        },
-        { status: 500 }
-      );
-    }
-
-    const audioBuffer = Buffer.from(await response.arrayBuffer());
+    // 将流转换为 Buffer
+    const audioBuffer = await streamToBuffer(audioStream);
 
     // 上传到 R2
-    const key = `ielts-tts/${Date.now()}.webm`;
-    const audioUrl = await uploadToR2(audioBuffer, key, 'audio/webm');
+    const key = `ielts-tts/${Date.now()}.mp3`;
+    const audioUrl = await uploadToR2(audioBuffer, key, 'audio/mpeg');
 
     return NextResponse.json({
       success: true,
