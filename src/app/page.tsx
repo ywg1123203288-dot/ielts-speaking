@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Part, TopicWithCards } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Headphones, Plus, MessageCircle, Trash2 } from 'lucide-react';
+import { Headphones, Plus, MessageCircle, Trash2, Settings } from 'lucide-react';
 
 export default function Home() {
   const [parts, setParts] = useState<Part[]>([]);
@@ -128,10 +129,13 @@ export default function Home() {
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-macaron-pink to-macaron-lavender">
                 <Headphones className="h-5 w-5 text-white" />
               </div>
-              <div>
+              <div className="flex-1">
                 <h1 className="font-semibold text-foreground">IELTS Study</h1>
                 <p className="text-xs text-muted-foreground">雅思口语素材库</p>
               </div>
+              <Link href="/settings" className="p-2 hover:bg-accent rounded-lg transition-colors">
+                <Settings className="h-4 w-4 text-muted-foreground" />
+              </Link>
             </div>
           </div>
 
