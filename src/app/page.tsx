@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Part, TopicWithCards } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Headphones, Plus, MessageCircle, Trash2, Settings } from 'lucide-react';
 
 export default function Home() {
@@ -13,6 +14,7 @@ export default function Home() {
   const [topics, setTopics] = useState<TopicWithCards[]>([]);
   const [selectedPartId, setSelectedPartId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [topicsLoading, setTopicsLoading] = useState(false);
   const [showNewTopic, setShowNewTopic] = useState(false);
   const [newTopicName, setNewTopicName] = useState('');
 
@@ -35,6 +37,7 @@ export default function Home() {
   // 获取话题列表
   const fetchTopics = () => {
     if (selectedPartId) {
+      setTopicsLoading(true);
       fetch(`/api/topics?partId=${selectedPartId}`)
         .then(res => res.json())
         .then(result => {
@@ -42,7 +45,8 @@ export default function Home() {
             setTopics(result.data);
           }
         })
-        .catch(console.error);
+        .catch(console.error)
+        .finally(() => setTopicsLoading(false));
     }
   };
 
@@ -107,8 +111,51 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-muted-foreground">加载中...</div>
+      <div className="flex h-screen overflow-hidden bg-background">
+        {/* 装饰性背景 */}
+        <div className="decoration-blob decoration-blob-pink w-96 h-96 -top-48 -left-48" />
+        <div className="decoration-blob decoration-blob-mint w-96 h-96 -bottom-48 -right-48" />
+        <div className="decoration-blob decoration-blob-lavender w-64 h-64 top-1/3 right-1/4" />
+
+        {/* 侧边栏骨架 */}
+        <aside className="w-64 border-r border-border bg-sidebar/50 backdrop-blur-sm relative z-10 p-6">
+          <div className="flex items-center gap-3 mb-8">
+            <Skeleton className="h-10 w-10 rounded-xl" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            {[1, 2, 3].map(i => (
+              <Skeleton key={i} className="h-12 w-full rounded-xl" />
+            ))}
+          </div>
+        </aside>
+
+        {/* 主内容骨架 */}
+        <main className="flex-1 overflow-auto relative z-10 p-8">
+          <div className="mb-8 flex items-center justify-between">
+            <div>
+              <Skeleton className="h-10 w-48 mb-2" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+            <Skeleton className="h-10 w-28 rounded-xl" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <Card key={i} className="border-0 bg-card/80 backdrop-blur-sm shadow-lg rounded-2xl overflow-hidden">
+                <Skeleton className="h-2 w-full" />
+                <CardHeader>
+                  <Skeleton className="h-6 w-3/4" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-8 w-1/2 rounded-lg" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </main>
       </div>
     );
   }
@@ -232,7 +279,21 @@ export default function Home() {
           )}
 
           {/* 话题卡片网格 */}
-          {topics.length === 0 ? (
+          {topicsLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <Card key={i} className="border-0 bg-card/80 backdrop-blur-sm shadow-lg rounded-2xl overflow-hidden">
+                  <Skeleton className="h-2 w-full" />
+                  <CardHeader>
+                    <Skeleton className="h-6 w-3/4" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-8 w-1/2 rounded-lg" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : topics.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-96 text-center">
               <MessageCircle className="h-16 w-16 text-muted-foreground/50 mb-4" />
               <h3 className="text-xl font-medium text-muted-foreground mb-2">
