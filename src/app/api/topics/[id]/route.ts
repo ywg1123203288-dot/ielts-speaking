@@ -1,33 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getAuthenticatedClient } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const client = getSupabaseClient();
+    const { client, user } = await getAuthenticatedClient();
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: '未登录' }, { status: 401 });
+    }
+
     const { id } = await params;
     const topicIdNum = parseInt(id);
-    
-    // 1. 查询话题
+
+    // 1. 查询话题（并验证用户 ownership）
     const { data: topicData, error: topicError } = await client
       .from('topics')
       .select('*')
       .eq('id', topicIdNum)
+      .eq('user_id', user.id) // 只获取属于当前用户的话题
       .single();
-    
-    if (topicError) throw new Error(`查询话题失败: ${topicError.message}`);
-    
+
+    if (topicError || !topicData) {
+      return NextResponse.json({ success: false, error: '话题不存在' }, { status: 404 });
+    }
+
     // 2. 查询卡片
     const { data: cardsData, error: cardsError } = await client
       .from('cards')
       .select('*')
       .eq('topic_id', topicIdNum)
       .order('order', { ascending: true });
-    
+
     if (cardsError) throw new Error(`查询卡片失败: ${cardsError.message}`);
-    
+
     // 3. 一次性查询所有问题（如果有卡片的话）
     let questionsData: any[] = [];
     if (cardsData && cardsData.length > 0) {
@@ -37,12 +46,12 @@ export async function GET(
         .select('*')
         .in('card_id', cardIds)
         .order('order', { ascending: true });
-      
+
       if (!qError && qData) {
         questionsData = qData;
       }
     }
-    
+
     // 4. 在内存中分组问题到对应卡片
     const questionsByCardId = new Map<number, any[]>();
     questionsData.forEach(q => {
@@ -50,16 +59,16 @@ export async function GET(
       list.push(q);
       questionsByCardId.set(q.card_id, list);
     });
-    
+
     // 5. 组装卡片数据
     const cardsWithQuestions = (cardsData || []).map(card => ({
       ...card,
       questions: questionsByCardId.get(card.id) || [],
       question_count: questionsByCardId.get(card.id)?.length || 0
     }));
-    
-    return NextResponse.json({ 
-      success: true, 
+
+    return NextResponse.json({
+      success: true,
       data: { ...topicData, cards: cardsWithQuestions }
     });
   } catch (error) {
@@ -76,23 +85,41 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const client = getSupabaseClient();
+    const { client, user } = await getAuthenticatedClient();
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: '未登录' }, { status: 401 });
+    }
+
     const { id } = await params;
+    const topicIdNum = parseInt(id);
     const body = await request.json();
-    
+
+    // 验证用户拥有该话题
+    const { data: existing } = await client
+      .from('topics')
+      .select('id')
+      .eq('id', topicIdNum)
+      .eq('user_id', user.id)
+      .single();
+
+    if (!existing) {
+      return NextResponse.json({ success: false, error: '话题不存在' }, { status: 404 });
+    }
+
     const updateData: Record<string, unknown> = {};
     if (body.name !== undefined) updateData.name = body.name;
     if (body.order !== undefined) updateData.order = body.order;
-    
+
     const { data, error } = await client
       .from('topics')
       .update(updateData)
-      .eq('id', parseInt(id))
+      .eq('id', topicIdNum)
       .select()
       .single();
-    
+
     if (error) throw new Error(`更新失败: ${error.message}`);
-    
+
     return NextResponse.json({ success: true, data });
   } catch (error) {
     console.error('更新Topic失败:', error);
@@ -108,16 +135,34 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const client = getSupabaseClient();
+    const { client, user } = await getAuthenticatedClient();
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: '未登录' }, { status: 401 });
+    }
+
     const { id } = await params;
-    
+    const topicIdNum = parseInt(id);
+
+    // 验证用户拥有该话题
+    const { data: existing } = await client
+      .from('topics')
+      .select('id')
+      .eq('id', topicIdNum)
+      .eq('user_id', user.id)
+      .single();
+
+    if (!existing) {
+      return NextResponse.json({ success: false, error: '话题不存在' }, { status: 404 });
+    }
+
     const { error } = await client
       .from('topics')
       .delete()
-      .eq('id', parseInt(id));
-    
+      .eq('id', topicIdNum);
+
     if (error) throw new Error(`删除失败: ${error.message}`);
-    
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('删除Topic失败:', error);

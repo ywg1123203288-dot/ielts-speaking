@@ -1,4 +1,4 @@
-import { pgTable, serial, timestamp, varchar, text, jsonb, integer, index } from "drizzle-orm/pg-core"
+import { pgTable, serial, timestamp, varchar, text, jsonb, integer, index, uuid, boolean } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 
@@ -7,6 +7,39 @@ export const healthCheck = pgTable("health_check", {
 	id: serial().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 });
+
+// 用户资料表（扩展 Supabase Auth）
+export const profiles = pgTable(
+	"profiles",
+	{
+		id: uuid("id").primaryKey(), // 直接对应 auth.users.id
+		email: varchar("email", { length: 255 }).notNull(),
+		subscriptionStatus: varchar("subscription_status", { length: 50 }).notNull().default("free"), // free, active, expired, banned
+		expiresAt: timestamp("expires_at", { withTimezone: true }),
+		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }),
+	},
+	(table) => [index("profiles_email_idx").on(table.email)]
+);
+
+// 邀请码表
+export const inviteCodes = pgTable(
+	"invite_codes",
+	{
+		id: serial().primaryKey(),
+		code: varchar("code", { length: 20 }).notNull().unique(),
+		usedBy: uuid("used_by"), // 关联 profiles.id
+		usedAt: timestamp("used_at", { withTimezone: true }),
+		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+		maxUses: integer("max_uses").notNull().default(1), // 允许使用次数
+		currentUses: integer("current_uses").notNull().default(0), // 已使用次数
+		isActive: boolean("is_active").notNull().default(true),
+	},
+	(table) => [
+		index("invite_codes_code_idx").on(table.code),
+		index("invite_codes_used_by_idx").on(table.usedBy)
+	]
+);
 
 // Part 1/2/3 分类表
 export const parts = pgTable(
@@ -27,6 +60,7 @@ export const topics = pgTable(
 	{
 		id: serial().primaryKey(),
 		partId: integer("part_id").notNull().references(() => parts.id, { onDelete: "cascade" }),
+		userId: uuid("user_id").notNull(), // 用户ID，用于数据隔离
 		name: varchar("name", { length: 100 }).notNull(), // 如 "Music", "Hometown"
 		order: integer("order").notNull().default(1),
 		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -34,7 +68,8 @@ export const topics = pgTable(
 	},
 	(table) => [
 		index("topics_part_id_idx").on(table.partId),
-		index("topics_order_idx").on(table.order)
+		index("topics_order_idx").on(table.order),
+		index("topics_user_id_idx").on(table.userId)
 	]
 );
 

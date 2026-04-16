@@ -1,5 +1,13 @@
 // 数据库表类型定义
 
+// 用户类型
+export interface User {
+  id: string;
+  email: string;
+  subscriptionStatus: 'free' | 'active' | 'expired' | 'banned';
+  expiresAt: string | null;
+}
+
 export interface Part {
   id: number;
   name: string;
@@ -11,6 +19,7 @@ export interface Part {
 export interface Topic {
   id: number;
   part_id: number;
+  user_id: string; // 用户ID，用于数据隔离
   name: string;
   order: number;
   created_at: string;
