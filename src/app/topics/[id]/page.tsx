@@ -264,7 +264,7 @@ export default function TopicPage() {
       alert('请输入问题内容');
       return;
     }
-    
+
     try {
       const response = await fetch('/api/questions', {
         method: 'POST',
@@ -280,7 +280,22 @@ export default function TopicPage() {
       if (result.success && result.data) {
         setNewQuestionCardId(null);
         setNewQuestionContent('');
-        fetchTopicData();
+        // 直接更新本地状态，不刷新整个页面
+        setCards(prevCards =>
+          prevCards.map(card => {
+            if (card.id === cardId) {
+              return {
+                ...card,
+                questions: [...(card.questions || []), result.data]
+              };
+            }
+            return card;
+          })
+        );
+        // 展开该卡片，显示新添加的问题
+        setExpandedCards(prev => new Set(prev).add(cardId));
+        // 展开该问题
+        setExpandedQuestionId(result.data.id);
       } else {
         alert('添加问题失败：' + (result.error || '未知错误'));
       }
