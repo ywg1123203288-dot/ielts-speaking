@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
-import { generateInviteCode } from '@/lib/auth';
-
-const SUPABASE_COOKIE_NAME = 'sb-access-token';
+import { createSupabaseBrowserClient, generateInviteCode } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,10 +19,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    const supabase = createSupabaseBrowserClient();
 
     // 验证邀请码
     const { data: invite, error: inviteError } = await supabase
@@ -91,12 +84,10 @@ export async function POST(request: NextRequest) {
       .insert({
         id: userId,
         email,
-        subscription_status: 'free', // 默认免费用户
+        subscription_status: 'free',
       });
 
     if (profileError) {
-      // 如果 profile 创建失败，删除 auth 用户
-      await supabase.auth.admin.deleteUser(userId);
       return NextResponse.json(
         { success: false, error: '创建用户资料失败' },
         { status: 500 }
@@ -121,21 +112,9 @@ export async function POST(request: NextRequest) {
         .insert({
           code: newCode,
           used_by: invite.used_by,
-          max_uses: 3, // 新邀请码允许3次使用
+          max_uses: 3,
           is_active: true,
         });
-    }
-
-    // 设置 cookie
-    if (authData.session?.access_token) {
-      const cookieStore = await cookies();
-      cookieStore.set(SUPABASE_COOKIE_NAME, authData.session.access_token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7, // 7天
-        path: '/',
-      });
     }
 
     return NextResponse.json({

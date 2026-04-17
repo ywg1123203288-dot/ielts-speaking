@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-
-const SUPABASE_COOKIE_NAME = 'sb-access-token';
+import { createSupabaseBrowserClient } from '@/lib/auth';
 
 export async function POST() {
   try {
-    const cookieStore = await cookies();
-    cookieStore.delete(SUPABASE_COOKIE_NAME);
+    const supabase = createSupabaseBrowserClient();
+    await supabase.auth.signOut();
 
     return NextResponse.json({ success: true });
   } catch (error) {

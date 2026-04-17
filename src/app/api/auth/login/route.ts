@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
-
-const SUPABASE_COOKIE_NAME = 'sb-access-token';
+import { createSupabaseBrowserClient } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,10 +12,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    const supabase = createSupabaseBrowserClient();
 
     // 登录
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -55,18 +49,6 @@ export async function POST(request: NextRequest) {
         { success: false, error: '账号已被禁用' },
         { status: 403 }
       );
-    }
-
-    // 设置 cookie
-    if (authData.session?.access_token) {
-      const cookieStore = await cookies();
-      cookieStore.set(SUPABASE_COOKIE_NAME, authData.session.access_token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7, // 7天
-        path: '/',
-      });
     }
 
     return NextResponse.json({
