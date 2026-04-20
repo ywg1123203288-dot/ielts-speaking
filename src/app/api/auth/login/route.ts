@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseBrowserClient } from '@/lib/auth';
+import { createSupabaseServerClient } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createSupabaseBrowserClient();
+    const supabase = await createSupabaseServerClient();
 
     // 登录
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({

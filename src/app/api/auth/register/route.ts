@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseBrowserClient, generateInviteCode } from '@/lib/auth';
+import { createSupabaseServerClient, generateInviteCode } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createSupabaseBrowserClient();
+    const supabase = await createSupabaseServerClient();
 
     // 验证邀请码
     const { data: invite, error: inviteError } = await supabase
