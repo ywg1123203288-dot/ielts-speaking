@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     const supabase = createSupabaseBrowserClient();
 
     // 发送重置密码邮件
-    const { error } = await supabase.auth.resetPasswordEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${request.headers.get('origin')}/reset-password`,
     });
 
