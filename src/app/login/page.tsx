@@ -98,12 +98,6 @@ export default function LoginPage() {
               立即注册
             </Link>
           </div>
-
-          <div className="mt-2 text-center text-sm">
-            <Link href="/forgot-password" className="text-muted-foreground hover:underline">
-              忘记密码？
-            </Link>
-          </div>
         </CardContent>
       </Card>
     </div>
