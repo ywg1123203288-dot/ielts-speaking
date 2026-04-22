@@ -23,7 +23,8 @@ export async function GET(request: NextRequest) {
           id,
           name,
           part_id
-        )
+        ),
+        questions(count)
       `)
       .eq('topics.user_id', user.id)
       .order('created_at', { ascending: false });
@@ -47,7 +48,8 @@ export async function GET(request: NextRequest) {
       created_at: card.created_at,
       updated_at: card.updated_at,
       topic_name: card.topics?.name,
-      part_id: card.topics?.part_id
+      part_id: card.topics?.part_id,
+      questions: card.questions?.[0]?.count || 0
     })) || [];
 
     // 如果有搜索关键词，进行过滤
@@ -64,6 +66,52 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, data: filteredCards });
   } catch (error) {
     console.error('获取Cards列表失败:', error);
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : '未知错误' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const { client, user } = await getAuthenticatedClient();
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: '未登录' }, { status: 401 });
+    }
+
+    const body = await request.json();
+
+    // 验证用户拥有该 topic
+    const { data: topic } = await client
+      .from('topics')
+      .select('id')
+      .eq('id', body.topic_id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (!topic) {
+      return NextResponse.json({ success: false, error: '话题不存在' }, { status: 404 });
+    }
+
+    const { data, error } = await client
+      .from('cards')
+      .insert({
+        topic_id: body.topic_id,
+        title: body.title,
+        description: body.description || null,
+        hints: body.hints || null,
+        order: body.order || 1
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(`创建失败: ${error.message}`);
+
+    return NextResponse.json({ success: true, data });
+  } catch (error) {
+    console.error('创建Card失败:', error);
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : '未知错误' },
       { status: 500 }

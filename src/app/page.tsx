@@ -401,7 +401,7 @@ export default function Home() {
                             {parts.find(p => p.id === card.part_id)?.name || '未知'}
                           </span>
                           <span>
-                            {card.questions?.length || 0} 个问题
+                            {typeof card.questions === 'number' ? card.questions : (card.questions?.length || 0)} 个问题
                           </span>
                         </div>
                       </CardContent>
