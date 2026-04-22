@@ -100,6 +100,7 @@ export default function TopicPage() {
   const [newQuestionCardId, setNewQuestionCardId] = useState<number | null>(null);
   const [newQuestionContent, setNewQuestionContent] = useState('');
   const [expandedQuestionId, setExpandedQuestionId] = useState<number | null>(null);
+  const [isCreatingCard, setIsCreatingCard] = useState(false);
 
   // 话题名称编辑状态
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -172,7 +173,9 @@ export default function TopicPage() {
       alert('请输入卡片标题');
       return;
     }
+    if (isCreatingCard) return; // 防止重复创建
 
+    setIsCreatingCard(true);
     try {
       const response = await fetch('/api/cards', {
         method: 'POST',
@@ -195,6 +198,8 @@ export default function TopicPage() {
     } catch (error) {
       console.error('创建卡片失败:', error);
       alert('创建卡片失败，请查看控制台');
+    } finally {
+      setIsCreatingCard(false);
     }
   };
 
@@ -487,10 +492,16 @@ export default function TopicPage() {
                     value={newCardTitle}
                     onChange={(e) => setNewCardTitle(e.target.value)}
                     className="flex-1 rounded-xl border border-input bg-background px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    onKeyDown={(e) => e.key === 'Enter' && handleCreateCard()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !isCreatingCard) {
+                        e.preventDefault();
+                        handleCreateCard();
+                      }
+                    }}
+                    disabled={isCreatingCard}
                   />
-                  <Button onClick={handleCreateCard} className="rounded-xl">
-                    创建
+                  <Button onClick={handleCreateCard} disabled={isCreatingCard} className="rounded-xl">
+                    {isCreatingCard ? '创建中...' : '创建'}
                   </Button>
                   <Button
                     variant="outline"
