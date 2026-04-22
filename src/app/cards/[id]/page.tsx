@@ -78,6 +78,8 @@ export default function CardPage() {
   const [newQuestionContent, setNewQuestionContent] = useState('');
   const [showNewQuestion, setShowNewQuestion] = useState(false);
   const [isPart2, setIsPart2] = useState(false);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [editDescription, setEditDescription] = useState('');
 
   const updateQuestionInState = (updatedQuestion: Question) => {
     if (!card?.questions) return;
@@ -228,11 +230,68 @@ export default function CardPage() {
             </div>
           </div>
 
-          {/* Part 2 题目描述 */}
-          {isPart2 && card.description && (
+          {/* Part 2 题目描述 - 可编辑 */}
+          {isPart2 && (
             <Card className="mb-6 border-2 border-primary/20 bg-card/50 backdrop-blur-sm">
               <CardContent className="pt-6">
-                <div className="whitespace-pre-line text-foreground">{card.description}</div>
+                {isEditingDescription ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      placeholder="粘贴 Part 2 题目描述到这里..."
+                      className="w-full rounded-xl border border-input bg-background px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary min-h-[120px] resize-y"
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          // 保存 description
+                          fetch(`/api/cards/${cardId}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ description: editDescription })
+                          }).then(res => res.json())
+                          .then(result => {
+                            if (result.success && result.data) {
+                              setCard({ ...card, description: editDescription });
+                              setIsEditingDescription(false);
+                            }
+                          });
+                        }}
+                        className="rounded-xl"
+                      >
+                        保存
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditDescription(card.description || '');
+                          setIsEditingDescription(false);
+                        }}
+                        className="rounded-xl"
+                      >
+                        取消
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => {
+                      setEditDescription(card.description || '');
+                      setIsEditingDescription(true);
+                    }}
+                    className="cursor-pointer hover:bg-muted/50 rounded-lg p-2 -m-2 min-h-[80px]"
+                  >
+                    {card.description ? (
+                      <div className="whitespace-pre-line text-foreground">{card.description}</div>
+                    ) : (
+                      <div className="text-muted-foreground italic">点击添加题目描述...</div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
