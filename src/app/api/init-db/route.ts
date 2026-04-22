@@ -88,6 +88,8 @@ CREATE TABLE IF NOT EXISTS cards (
   id SERIAL PRIMARY KEY,
   topic_id INTEGER REFERENCES topics(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
+  description TEXT, -- Part 2 题目完整描述（如 "You should say..."）
+  hints JSONB, -- Part 2 的四个提示点数组
   "order" INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE

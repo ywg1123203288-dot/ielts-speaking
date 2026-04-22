@@ -30,6 +30,8 @@ export interface Card {
   id: number;
   topic_id: number;
   title: string;
+  description?: string; // Part 2 题目完整描述
+  hints?: string[]; // Part 2 的四个提示点
   order: number;
   created_at: string;
   updated_at?: string;
@@ -71,4 +73,11 @@ export interface TopicWithCards extends Topic {
 export interface CardWithQuestions extends Card {
   questions?: Question[];
   question_count?: number;
+  topic_name?: string; // 用于显示卡片所属的话题名称
+  part_id?: number; // Part 2/3 标识
+}
+
+// 新增：直接从 API 获取的卡片类型（带 part 信息）
+export interface CardWithPart extends Card {
+  part_id: number;
 }

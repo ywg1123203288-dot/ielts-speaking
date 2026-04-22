@@ -80,6 +80,8 @@ export const cards = pgTable(
 		id: serial().primaryKey(),
 		topicId: integer("topic_id").notNull().references(() => topics.id, { onDelete: "cascade" }),
 		title: text("title").notNull(), // 卡片标题，如 "Describe a song that is meaningful to you"
+		description: text("description"), // Part 2 题目完整描述（如 "You should say..."）
+		hints: jsonb("hints").$type<string[]>(), // Part 2 的四个提示点数组
 		order: integer("order").notNull().default(1),
 		createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 		updatedAt: timestamp("updated_at", { withTimezone: true }),
