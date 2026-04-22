@@ -201,7 +201,7 @@ export default function CardPage() {
             <div>
               <h2 className="text-3xl font-bold text-foreground">{card.title}</h2>
               <p className="text-muted-foreground mt-1">
-                {card.questions?.length || 0} 个问题
+                {isPart2 ? 'Part 2 回答' : `${card.questions?.length || 0} 个问题`}
               </p>
             </div>
           </div>
@@ -225,7 +225,7 @@ export default function CardPage() {
             </Card>
           )}
 
-          {/* 新增问题（Part 1）或内容区域（Part 2） */}
+          {/* 新增问题（Part 1）或添加回答（Part 2） */}
           {!isPart2 && (
             <>
               {showNewQuestion ? (
@@ -268,6 +268,40 @@ export default function CardPage() {
                 </Button>
               )}
             </>
+          )}
+
+          {/* Part 2: 添加回答按钮 */}
+          {isPart2 && (!card.questions || card.questions.length === 0) && (
+            <Card className="mb-6 border-2 border-primary/20 bg-card/50 backdrop-blur-sm">
+              <CardContent className="pt-6">
+                <p className="text-muted-foreground mb-4">点击下方按钮添加 Part 2 回答内容</p>
+                <Button
+                  onClick={() => {
+                    // 为 Part 2 创建一个默认问题
+                    fetch('/api/questions', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        card_id: parseInt(cardId),
+                        content: 'Part 2 回答',
+                        order: 1
+                      })
+                    }).then(res => res.json())
+                    .then(result => {
+                      if (result.success && result.data) {
+                        fetchCardData();
+                      } else {
+                        alert('添加失败：' + (result.error || '未知错误'));
+                      }
+                    });
+                  }}
+                  className="rounded-xl"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  添加回答
+                </Button>
+              </CardContent>
+            </Card>
           )}
 
           {/* 问题列表 */}
