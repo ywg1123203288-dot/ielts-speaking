@@ -98,10 +98,32 @@ export default function CardPage() {
       setLoading(true);
       fetch(`/api/cards/${cardId}`)
         .then(res => res.json())
-        .then(result => {
+        .then(async result => {
           if (result.success && result.data) {
             setCard(result.data);
             setIsPart2(result.data.part_id === 2);
+
+            // Part 2: 如果没有 question，自动创建一个
+            if (result.data.part_id === 2 && (!result.data.questions || result.data.questions.length === 0)) {
+              const createRes = await fetch('/api/questions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  card_id: parseInt(cardId),
+                  content: 'Part 2 回答',
+                  order: 1
+                })
+              });
+              const createData = await createRes.json();
+              if (createData.success && createData.data) {
+                // 重新获取数据
+                const refreshRes = await fetch(`/api/cards/${cardId}`);
+                const refreshData = await refreshRes.json();
+                if (refreshData.success && refreshData.data) {
+                  setCard(refreshData.data);
+                }
+              }
+            }
           }
         })
         .catch(console.error)
@@ -206,21 +228,11 @@ export default function CardPage() {
             </div>
           </div>
 
-          {/* Part 2 题目描述和提示 */}
+          {/* Part 2 题目描述 */}
           {isPart2 && card.description && (
             <Card className="mb-6 border-2 border-primary/20 bg-card/50 backdrop-blur-sm">
               <CardContent className="pt-6">
-                <p className="text-sm text-foreground mb-3 whitespace-pre-line">{card.description}</p>
-                {card.hints && card.hints.length > 0 && (
-                  <div className="space-y-2 mt-4">
-                    {card.hints.map((hint, idx) => (
-                      <div key={idx} className="flex items-start gap-2 text-sm">
-                        <span className="text-primary font-medium">{idx + 1}.</span>
-                        <span className="text-muted-foreground">{hint}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <div className="whitespace-pre-line text-foreground">{card.description}</div>
               </CardContent>
             </Card>
           )}
@@ -270,52 +282,19 @@ export default function CardPage() {
             </>
           )}
 
-          {/* Part 2: 添加回答按钮 */}
-          {isPart2 && (!card.questions || card.questions.length === 0) && (
-            <Card className="mb-6 border-2 border-primary/20 bg-card/50 backdrop-blur-sm">
-              <CardContent className="pt-6">
-                <p className="text-muted-foreground mb-4">点击下方按钮添加 Part 2 回答内容</p>
-                <Button
-                  onClick={() => {
-                    // 为 Part 2 创建一个默认问题
-                    fetch('/api/questions', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        card_id: parseInt(cardId),
-                        content: 'Part 2 回答',
-                        order: 1
-                      })
-                    }).then(res => res.json())
-                    .then(result => {
-                      if (result.success && result.data) {
-                        fetchCardData();
-                      } else {
-                        alert('添加失败：' + (result.error || '未知错误'));
-                      }
-                    });
-                  }}
-                  className="rounded-xl"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  添加回答
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* 问题列表 */}
+          {/* 问题列表 - Part 2 直接显示 TTS/STT 区域，Part 1 显示问题列表 */}
           {card.questions && card.questions.length > 0 ? (
             <div className="space-y-4">
               {card.questions.map((question, index) => (
                 <QuestionItem
                   key={question.id}
                   question={question}
-                  index={index}
+                  index={isPart2 ? 0 : index}
                   onQuestionUpdate={updateQuestionInState}
                   onQuestionDelete={handleDeleteQuestion}
-                  isExpanded={expandedQuestionId === question.id}
+                  isExpanded={expandedQuestionId === question.id || isPart2}
                   onToggleExpand={() => {
+                    if (isPart2) return; // Part 2 始终展开
                     setExpandedQuestionId(
                       expandedQuestionId === question.id ? null : question.id
                     );
@@ -324,15 +303,17 @@ export default function CardPage() {
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-64 text-center">
-              <MessageCircle className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-medium text-muted-foreground mb-2">
-                {isPart2 ? '还没有回答内容' : '还没有问题'}
-              </h3>
-              <p className="text-sm text-muted-foreground/80">
-                {isPart2 ? '点击上方添加回答' : '点击上方按钮添加问题'}
-              </p>
-            </div>
+            !isPart2 && (
+              <div className="flex flex-col items-center justify-center h-64 text-center">
+                <MessageCircle className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                <h3 className="text-lg font-medium text-muted-foreground mb-2">
+                  还没有问题
+                </h3>
+                <p className="text-sm text-muted-foreground/80">
+                  点击上方按钮添加问题
+                </p>
+              </div>
+            )
           )}
         </div>
       </div>
