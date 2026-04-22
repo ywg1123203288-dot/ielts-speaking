@@ -150,6 +150,9 @@ export default function TopicPage() {
     }
   };
 
+  // 判断是否是 Part 2（根据 part_id = 2 或话题名称包含 Part 2）
+  const isPart2 = topic?.part_id === 2;
+
   useEffect(() => {
     fetchTopicData();
   }, [topicId]);
@@ -527,7 +530,7 @@ export default function TopicPage() {
               >
                 <div className="space-y-4">
                   {cards.map(card => (
-                    <SortableCard 
+                    <SortableCard
                       key={card.id}
                       card={card}
                       isExpanded={expandedCards.has(card.id)}
@@ -538,81 +541,141 @@ export default function TopicPage() {
                       setEditingCardId={setEditingCardId}
                       handleUpdateCardTitle={handleUpdateCardTitle}
                       handleDeleteCard={handleDeleteCard}
+                      isPart2={isPart2}
                     >
-                      {/* 添加问题输入框 */}
-                      {newQuestionCardId === card.id ? (
-                        <div className="mb-4 space-y-2">
-                          <textarea
-                            placeholder="输入问题内容，如：Why is this song meaningful to you?"
-                            value={newQuestionContent}
-                            onChange={(e) => setNewQuestionContent(e.target.value)}
-                            className="w-full rounded-xl border border-input bg-background px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary min-h-[80px] resize-none"
-                            autoFocus
+                      {/* Part 2: 简化模式 - 直接显示音频/转写区域 */}
+                      {isPart2 && card.questions && card.questions.length > 0 && (
+                        <div className="space-y-2">
+                          <QuestionItem
+                            question={card.questions[0]}
+                            index={0}
+                            onQuestionUpdate={(updated) => {
+                              const newCards = cards.map(c => {
+                                if (c.id === card.id && c.questions) {
+                                  const newQuestions = [...c.questions];
+                                  newQuestions[0] = updated;
+                                  return { ...c, questions: newQuestions };
+                                }
+                                return c;
+                              });
+                              setCards(newCards);
+                            }}
+                            onQuestionDelete={(id) => {
+                              const newCards = cards.map(c => {
+                                if (c.id === card.id && c.questions) {
+                                  return { ...c, questions: c.questions.filter(q => q.id !== id) };
+                                }
+                                return c;
+                              });
+                              setCards(newCards);
+                            }}
+                            isExpanded={expandedQuestionId === card.questions?.[0]?.id}
+                            onToggleExpand={() => {
+                              const questionId = card.questions?.[0]?.id;
+                              setExpandedQuestionId(
+                                expandedQuestionId === questionId ? null : questionId ?? null
+                              );
+                            }}
                           />
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={() => handleAddQuestion(card.id, newQuestionContent)}
-                              className="rounded-xl"
-                            >
-                              添加
-                            </Button>
-                            <Button
-                              variant="outline"
-                              onClick={() => {
-                                setNewQuestionCardId(null);
-                                setNewQuestionContent('');
-                              }}
-                              className="rounded-xl"
-                            >
-                              取消
-                            </Button>
-                          </div>
                         </div>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          onClick={() => setNewQuestionCardId(card.id)}
-                          className="mb-4 rounded-xl w-full border-dashed border-2"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          添加问题
-                        </Button>
                       )}
 
-                      {/* 问题列表 - 可拖拽排序 */}
-                      {card.questions && card.questions.length > 0 ? (
-                        <DndContext
-                          sensors={sensors}
-                          collisionDetection={closestCenter}
-                          onDragEnd={(event) => handleDragEnd(event, card.id)}
-                        >
-                          <SortableContext
-                            items={card.questions.map((q: any) => q.id)}
-                            strategy={verticalListSortingStrategy}
+                      {/* Part 2 但还没有回答时，显示添加按钮 */}
+                      {isPart2 && (!card.questions || card.questions.length === 0) && (
+                        <div className="text-center py-8">
+                          <p className="text-muted-foreground text-sm mb-4">
+                            点击下方按钮添加回答内容
+                          </p>
+                          <Button
+                            variant="outline"
+                            onClick={() => setNewQuestionCardId(card.id)}
+                            className="rounded-xl border-dashed border-2"
                           >
-                            <div className="space-y-2">
-                              {card.questions.map((question: any, index: number) => (
-                                <SortableQuestionItem
-                                  key={question.id}
-                                  question={question}
-                                  index={index}
-                                  onQuestionUpdate={updateQuestionInState}
-                                  onQuestionDelete={deleteQuestionInState}
-                                  isExpanded={expandedQuestionId === question.id}
-                                  onToggleExpand={() => {
-                                    setExpandedQuestionId(
-                                      expandedQuestionId === question.id ? null : question.id
-                                    );
-                                  }}
-                                />
-                              ))}
-                            </div>
-                          </SortableContext>
-                        </DndContext>
-                      ) : (
-                        <div className="text-center py-8 text-muted-foreground text-sm">
-                          点击上方按钮添加问题
+                            <Plus className="h-4 w-4 mr-2" />
+                            添加回答
+                          </Button>
                         </div>
+                      )}
+
+                      {/* Part 1: 多问题模式 */}
+                      {!isPart2 && (
+                        <>
+                          {/* 添加问题输入框 */}
+                          {newQuestionCardId === card.id ? (
+                            <div className="mb-4 space-y-2">
+                              <textarea
+                                placeholder="输入问题内容，如：Why is this song meaningful to you?"
+                                value={newQuestionContent}
+                                onChange={(e) => setNewQuestionContent(e.target.value)}
+                                className="w-full rounded-xl border border-input bg-background px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary min-h-[80px] resize-none"
+                                autoFocus
+                              />
+                              <div className="flex gap-2">
+                                <Button
+                                  onClick={() => handleAddQuestion(card.id, newQuestionContent)}
+                                  className="rounded-xl"
+                                >
+                                  添加
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  onClick={() => {
+                                    setNewQuestionCardId(null);
+                                    setNewQuestionContent('');
+                                  }}
+                                  className="rounded-xl"
+                                >
+                                  取消
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              onClick={() => setNewQuestionCardId(card.id)}
+                              className="mb-4 rounded-xl w-full border-dashed border-2"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              添加问题
+                            </Button>
+                          )}
+
+                          {/* 问题列表 - 可拖拽排序 */}
+                          {card.questions && card.questions.length > 0 ? (
+                            <DndContext
+                              sensors={sensors}
+                              collisionDetection={closestCenter}
+                              onDragEnd={(event) => handleDragEnd(event, card.id)}
+                            >
+                              <SortableContext
+                                items={card.questions.map((q: any) => q.id)}
+                                strategy={verticalListSortingStrategy}
+                              >
+                                <div className="space-y-2">
+                                  {card.questions.map((question: any, index: number) => (
+                                    <SortableQuestionItem
+                                      key={question.id}
+                                      question={question}
+                                      index={index}
+                                      onQuestionUpdate={updateQuestionInState}
+                                      onQuestionDelete={deleteQuestionInState}
+                                      isExpanded={expandedQuestionId === question.id}
+                                      onToggleExpand={() => {
+                                        setExpandedQuestionId(
+                                          expandedQuestionId === question.id ? null : question.id
+                                        );
+                                      }}
+                                    />
+                                  ))}
+                                </div>
+                              </SortableContext>
+                            </DndContext>
+                          ) : (
+                            <div className="text-center py-8 text-muted-foreground text-sm">
+                              点击上方按钮添加问题
+                            </div>
+                          )}
+                        </>
                       )}
                     </SortableCard>
                   ))}
@@ -627,7 +690,7 @@ export default function TopicPage() {
 }
 
 // 可排序的卡片组件
-function SortableCard({ 
+function SortableCard({
   card,
   isExpanded,
   onToggleExpand,
@@ -637,8 +700,9 @@ function SortableCard({
   setEditingCardId,
   handleUpdateCardTitle,
   handleDeleteCard,
+  isPart2,
   children
-}: { 
+}: {
   card: CardWithQuestions;
   isExpanded: boolean;
   onToggleExpand: () => void;
@@ -648,6 +712,7 @@ function SortableCard({
   setEditingCardId: (id: number | null) => void;
   handleUpdateCardTitle: (id: number) => void;
   handleDeleteCard: (id: number) => void;
+  isPart2?: boolean;
   children: React.ReactNode;
 }) {
   const {
